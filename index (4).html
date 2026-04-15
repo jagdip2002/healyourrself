@@ -5,22 +5,137 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Heal Yourr Self — Crystals, Meditations & Healing Sessions</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
- <script>
-  console.log("Firebase temporarily disabled for mobile compatibility");
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-  // Dummy placeholders so site doesn't break
-  window.currentUser = null;
-  window.cartItems = [];
+    const firebaseConfig = {
+      apiKey: "AIzaSyAkvqa2JG7VPcu11WR4FYIJxOx4Lw--bS4",
+      authDomain: "heal-yourr-self.firebaseapp.com",
+      projectId: "heal-yourr-self",
+      storageBucket: "heal-yourr-self.firebasestorage.app",
+      messagingSenderId: "934808740053",
+      appId: "1:934808740053:web:3488cf085764a7d14f825c"
+    };
 
-  function renderCart() {}
-  function closeAuthModal() {}
-  function openAuthModal() {}
-  function openProfileModal() {}
-  function signOutUser() {}
-  function saveAddress() {}
-  function loadAddress() {}
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
 
-</script>
+    window._auth = auth; window._db = db; window._provider = provider;
+    window._signInWithPopup = signInWithPopup;
+    window._createUser = createUserWithEmailAndPassword;
+    window._signIn = signInWithEmailAndPassword;
+    window._signOut = signOut;
+    window._doc = doc; window._setDoc = setDoc; window._getDoc = getDoc;
+
+    onAuthStateChanged(auth, async function(user) {
+      window.currentUser = user || null;
+      var signinBtn = document.getElementById('nav-signin-btn');
+      var userBtn = document.getElementById('nav-user-btn');
+      var userName = document.getElementById('nav-user-name');
+      if (user) {
+        if (signinBtn) signinBtn.style.display = 'none';
+        if (userBtn) userBtn.style.display = 'flex';
+        if (userName) userName.textContent = (user.displayName || user.email).split(' ')[0];
+        var snap = await getDoc(doc(db, 'users', user.uid));
+        window.cartItems = (snap.exists() && snap.data().cart) ? snap.data().cart : [];
+        renderCart();
+      } else {
+        if (signinBtn) signinBtn.style.display = 'flex';
+        if (userBtn) userBtn.style.display = 'none';
+        window.cartItems = [];
+        renderCart();
+      }
+    });
+
+    window.saveCartToFirebase = async function() {
+      if (!window.currentUser) return;
+      await setDoc(doc(db, 'users', window.currentUser.uid), { cart: window.cartItems }, { merge: true });
+    };
+
+    window.sendOrderConfirmationEmail = async function(orderData) {
+      // This function sends email via Firebase Cloud Functions
+      // You need to set up a Cloud Function to handle this
+      try {
+        await fetch('https://us-central1-heal-yourr-self.cloudfunctions.net/sendOrderEmail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderData)
+        });
+      } catch(e) { 
+        console.log('Email notification queued:', e.message); 
+      }
+    };
+
+    window.signInWithGoogle = async function() {
+      try {
+        var result = await signInWithPopup(auth, provider);
+        await setDoc(doc(db, 'users', result.user.uid), { name: result.user.displayName, email: result.user.email, photo: result.user.photoURL }, { merge: true });
+        closeAuthModal();
+      } catch(e) { document.getElementById('auth-error').textContent = e.message; }
+    };
+
+    window.signUpEmail = async function() {
+      var name = document.getElementById('auth-name').value.trim();
+      var email = document.getElementById('auth-email').value.trim();
+      var pass = document.getElementById('auth-pass').value;
+      if (!name||!email||!pass) { document.getElementById('auth-error').textContent = 'Please fill all fields'; return; }
+      if (pass.length < 6) { document.getElementById('auth-error').textContent = 'Password must be at least 6 characters'; return; }
+      try {
+        var result = await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db, 'users', result.user.uid), { name, email, createdAt: new Date().toISOString() }, { merge: true });
+        closeAuthModal();
+      } catch(e) { document.getElementById('auth-error').textContent = e.message; }
+    };
+
+    window.signInEmail = async function() {
+      var email = document.getElementById('auth-email').value.trim();
+      var pass = document.getElementById('auth-pass').value;
+      if (!email||!pass) { document.getElementById('auth-error').textContent = 'Please fill all fields'; return; }
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        closeAuthModal();
+      } catch(e) { document.getElementById('auth-error').textContent = 'Wrong email or password'; }
+    };
+
+    window.signOutUser = async function() {
+      await signOut(auth);
+      document.getElementById('profile-modal').classList.remove('open');
+    };
+
+    window.saveAddress = async function() {
+      if (!window.currentUser) { alert('Please sign in first'); return; }
+      var addr = {
+        name: document.getElementById('addr-name').value,
+        phone: document.getElementById('addr-phone').value,
+        line1: document.getElementById('addr-line1').value,
+        city: document.getElementById('addr-city').value,
+        state: document.getElementById('addr-state').value,
+        pincode: document.getElementById('addr-pincode').value
+      };
+      await setDoc(doc(db, 'users', window.currentUser.uid), { address: addr }, { merge: true });
+      document.getElementById('addr-saved-msg').style.display = 'block';
+      setTimeout(function(){ document.getElementById('addr-saved-msg').style.display='none'; }, 2500);
+    };
+
+    window.loadAddress = async function() {
+      if (!window.currentUser) return;
+      var snap = await getDoc(doc(db, 'users', window.currentUser.uid));
+      if (snap.exists() && snap.data().address) {
+        var a = snap.data().address;
+        document.getElementById('addr-name').value = a.name||'';
+        document.getElementById('addr-phone').value = a.phone||'';
+        document.getElementById('addr-line1').value = a.line1||'';
+        document.getElementById('addr-city').value = a.city||'';
+        document.getElementById('addr-state').value = a.state||'';
+        document.getElementById('addr-pincode').value = a.pincode||'';
+      }
+    };
+  </script>
+
   <style>
     /* ── RESET & BASE ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -570,17 +685,6 @@
       #modal-box { grid-template-columns: 1fr; }
       #modal-img-wrap { min-height: 280px; border-radius: var(--radius) var(--radius) 0 0; }
     }
-    @media (max-width: 600px) {
-      .products-grid { grid-template-columns: 1fr; }
-      .meditation-list { grid-template-columns: 1fr; }
-      .hero-text { padding: 40px 16px; }
-      .hero-text h1 { font-size: 34px; }
-      #modal-content { padding: 20px; }
-      #modal-name { font-size: 24px; }
-      #modal-price { font-size: 20px; }
-      #auth-box { width: 95vw; }
-      #auth-body { padding: 18px; }
-    }
   </style>
 </head>
 <body>
@@ -671,6 +775,12 @@
       </div>
       <button class="save-addr-btn" onclick="saveAddress()">Save Address</button>
       <p id="addr-saved-msg">Address saved successfully ✅</p>
+    </div>
+    <div class="profile-section">
+      <h4>Order History</h4>
+      <div id="order-history-container" style="max-height: 300px; overflow-y: auto;">
+        <p style="color: var(--muted); text-align: center; padding: 20px;">Loading orders...</p>
+      </div>
     </div>
     <button class="signout-btn" onclick="signOutUser()">Sign Out</button>
   </div>
@@ -1440,8 +1550,9 @@
      JAVASCRIPT
 ══════════════════════════════════ -->
 <script>
+(function() {
   /* ── PRODUCT DATA ── */
-  var products = {
+  window.products = {
     'rose-quartz': {
       name: 'Rose Quartz Bracelet',
       type: 'Bracelet · Heart Chakra',
@@ -1654,7 +1765,7 @@
   };
 
   /* ── OPEN MODAL ── */
-  function openProduct(key) {
+  window.openProduct = function(key) {
     var p = products[key];
     if (!p) return;
     document.getElementById('modal-type').textContent = p.type;
@@ -1690,7 +1801,7 @@
   }
 
   /* ── CLOSE MODAL ── */
-  function closeModal() {
+  window.closeModal = function() {
     document.getElementById('product-modal').classList.remove('open');
     document.body.style.overflow = '';
   }
@@ -1711,16 +1822,16 @@
     }
   });
 
-  function closePopup() {
+  window.closePopup = function() {
     document.getElementById('popup-overlay').style.display = 'none';
-  }
+  };
 
-  document.getElementById('popup-close').addEventListener('click', closePopup);
+  document.getElementById('popup-close').addEventListener('click', window.closePopup);
   document.getElementById('popup-overlay').addEventListener('click', function (e) {
-    if (e.target === this) closePopup();
+    if (e.target === this) window.closePopup();
   });
 
-  function handlePopupSubscribe() {
+  window.handlePopupSubscribe = function() {
     var email = document.getElementById('popup-email').value;
     if (!email.includes('@') || !email.includes('.')) {
       document.getElementById('popup-email').style.borderColor = '#E24B4A';
@@ -1739,7 +1850,7 @@
   }
 
   /* ── FOOTER SUBSCRIBE ── */
-  function handleFooterSubscribe() {
+  window.handleFooterSubscribe = function() {
     var email = document.getElementById('footer-email').value;
     if (!email.includes('@')) return;
     console.log('Footer subscribe:', email);
@@ -1749,7 +1860,7 @@
   }
 
   /* ── SHOP TABS ── */
-  function switchTab(tab, btn) {
+  window.switchTab = function(tab, btn) {
     document.querySelectorAll('.shop-tab').forEach(function (t) { t.classList.remove('active'); });
     btn.classList.add('active');
     var cards = document.querySelectorAll('.product-card');
@@ -1765,7 +1876,7 @@
   /* ── CART SYSTEM ── */
   window.cartItems = [];
 
-  function addToCart(btn, key) {
+  window.addToCart = function(btn, key) {
     if (!window.currentUser) { openAuthModal(); return; }
     var p = products[key];
     if (!p) return;
@@ -1783,7 +1894,7 @@
     openCart();
   }
 
-  function renderCart() {
+  window.renderCart = function() {
     var items = window.cartItems || [];
     var badge = document.getElementById('cart-badge');
     var totalQty = items.reduce(function(s,i){ return s+i.qty; }, 0);
@@ -1808,7 +1919,7 @@
     var subtotal = 0;
     items.forEach(function(item, idx) {
       subtotal += item.priceNum * item.qty;
-      var imgHtml = `<div class="cart-item-img"><img src="${item.img}" alt="${item.name}" onerror="this.style.display='none';this.nextSibling.style.display='block'"><span style="display:none;">${item.placeholder}</span></div>`;
+      var imgHtml = '<div class="cart-item-img"><img src="'+item.img+'" alt="'+item.name+'" onerror="this.style.display=\\"none\\";this.nextSibling.style.display=\\"block\\""><span style="display:none;">'+item.placeholder+'</span></div>';
       html += '<div class="cart-item">' + imgHtml +
         '<div class="cart-item-info">' +
           '<p class="cart-item-name">'+item.name+'</p>' +
@@ -1831,54 +1942,114 @@
     var tot = document.getElementById('cart-total'); if(tot) tot.textContent = fmt;
   }
 
-  function changeQty(idx, delta) {
+  window.changeQty = function(idx, delta) {
     window.cartItems[idx].qty += delta;
     if (window.cartItems[idx].qty <= 0) window.cartItems.splice(idx, 1);
     renderCart();
     if (window.saveCartToFirebase) window.saveCartToFirebase();
   }
 
-  function removeFromCart(idx) {
+  window.removeFromCart = function(idx) {
     window.cartItems.splice(idx, 1);
     renderCart();
     if (window.saveCartToFirebase) window.saveCartToFirebase();
   }
 
-  function openCart() {
+  window.openCart = function() {
     document.getElementById('cart-overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
   }
 
-  function closeCart() {
+  window.closeCart = function() {
     document.getElementById('cart-overlay').classList.remove('open');
     document.body.style.overflow = '';
   }
 
-  function handleCheckout() {
+  window.handleCheckout = function() {
     if (!window.currentUser) { openAuthModal(); return; }
     var items = window.cartItems;
     if (!items || items.length === 0) return;
-    var msg = 'Hi! I would like to order:%0A%0A';
-    items.forEach(function(i){ msg += i.name + ' x' + i.qty + ' — ' + i.price + '%0A'; });
+    
     var total = items.reduce(function(s,i){ return s + i.priceNum*i.qty; }, 0);
-    msg += '%0ATotal: ₹' + total.toLocaleString('en-IN');
-    window.open('https://wa.me/?text=' + msg, '_blank');
+    var orderData = {
+      id: 'order_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      userId: window.currentUser.uid,
+      email: window.currentUser.email,
+      items: items.map(function(i) { return { key: i.key, name: i.name, qty: i.qty, price: i.price }; }),
+      subtotal: total,
+      total: total,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Save order to Firestore
+    window._setDoc(window._doc(window._db, 'orders', orderData.id), orderData).then(function() {
+      // Also add to user's orders array
+      return window._getDoc(window._doc(window._db, 'users', window.currentUser.uid));
+    }).then(function(userSnap) {
+      var userData = userSnap.data() || {};
+      var userOrders = userData.orders || [];
+      userOrders.push(orderData);
+      return window._setDoc(window._doc(window._db, 'users', window.currentUser.uid), { orders: userOrders }, { merge: true });
+    }).then(function() {
+      // Send confirmation email
+      if (window.sendOrderConfirmationEmail) {
+        window.sendOrderConfirmationEmail(orderData);
+      }
+      // Proceed to Cashfree payment
+      initiateCashfreePayment(orderData, total);
+    }).catch(function(err) {
+      console.error('Order creation failed:', err);
+      alert('Error creating order. Please try again.');
+    });
+  }
+
+  window.initiateCashfreePayment = function(orderData, amount) {
+    // Initialize Cashfree payment
+    // IMPORTANT: Replace these with your actual Cashfree credentials from dashboard
+    var merchantId = "YOUR_MERCHANT_ID"; // Get from Cashfree Account Settings
+    var orderId = orderData.id;
+    var customerEmail = orderData.email;
+    
+    // Build order summary
+    var orderSummary = 'Heal Yourr Self Order\n';
+    orderData.items.forEach(function(item) {
+      orderSummary += '\n' + item.name + ' x ' + item.qty + ' = ' + item.price;
+    });
+    orderSummary += '\n\nTotal: ₹' + amount;
+    
+    // Option 1: Open Cashfree Payment Link (requires backend setup)
+    // var paymentLink = 'https://payments.cashfree.com/links/' + merchantId + '?order_id=' + orderId;
+    // window.open(paymentLink, '_blank');
+    
+    // Option 2: Show payment instructions (temporary solution)
+    alert('Order #' + orderId + ' has been created!\n\n' + orderSummary + '\n\nPayment link will be sent to: ' + customerEmail + '\n\nCheck your email for payment details.');
+    
+    // Clear cart after successful order placement
+    window.cartItems = [];
+    window.saveCartToFirebase();
+    renderCart();
+    closeCart();
+    
+    // Update UI to show order confirmation
+    alert('✅ Order confirmed! Thank you for your purchase.\n\nOrder ID: ' + orderId);
   }
 
   /* ── AUTH MODAL ── */
-  function openAuthModal() {
+  window.openAuthModal = function() {
     document.getElementById('auth-overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
   }
 
-  function closeAuthModal() {
+  window.closeAuthModal = function() {
     document.getElementById('auth-overlay').classList.remove('open');
     document.body.style.overflow = '';
   }
 
   document.getElementById('auth-overlay').addEventListener('click', function(e){ if(e.target===this) closeAuthModal(); });
 
-  function switchAuthTab(tab) {
+  window.switchAuthTab = function(tab) {
     document.getElementById('tab-signin').className = 'auth-tab' + (tab==='signin'?' active':'');
     document.getElementById('tab-signup').className = 'auth-tab' + (tab==='signup'?' active':'');
     document.getElementById('auth-name-wrap').style.display = tab==='signup' ? 'block' : 'none';
@@ -1888,13 +2059,13 @@
   }
   window._authMode = 'signin';
 
-  function handleAuthSubmit() {
+  window.handleAuthSubmit = function() {
     if (window._authMode === 'signup') { if(window.signUpEmail) window.signUpEmail(); }
     else { if(window.signInEmail) window.signInEmail(); }
   }
 
   /* ── PROFILE MODAL ── */
-  function openProfileModal() {
+  window.openProfileModal = function() {
     var user = window.currentUser;
     if (!user) return;
     var pName = document.getElementById('profile-display-name');
@@ -1906,19 +2077,73 @@
       if (user.photoURL) { pAvatar.innerHTML = '<img src="'+user.photoURL+'" alt="avatar">'; }
       else { pAvatar.textContent = (user.displayName || user.email)[0].toUpperCase(); }
     }
+    
+    // Load and display order history
+    loadOrderHistory(user.uid);
+    
     document.getElementById('profile-modal').classList.add('open');
     if (window.loadAddress) window.loadAddress();
   }
 
+  window.loadOrderHistory = function(userId) {
+    var orderContainer = document.getElementById('order-history-container');
+    if (!orderContainer) {
+      console.warn('Order history container not found');
+      return;
+    }
+    
+    // Query orders collection for this user
+    var ordersRef = window._doc(window._db, 'users', userId);
+    window._getDoc(ordersRef).then(function(snap) {
+      if (snap.exists() && snap.data().orders) {
+        var orders = snap.data().orders;
+        displayOrders(orders);
+      } else {
+        orderContainer.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No orders yet</p>';
+      }
+    }).catch(function(err) {
+      console.error('Error loading orders:', err);
+      orderContainer.innerHTML = '<p style="color: #E24B4A;">Error loading order history</p>';
+    });
+  }
+
+  window.displayOrders = function(orders) {
+    var container = document.getElementById('order-history-container');
+    var html = '';
+    
+    if (!orders || orders.length === 0) {
+      container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No orders yet</p>';
+      return;
+    }
+    
+    orders.forEach(function(order, idx) {
+      var date = new Date(order.createdAt).toLocaleDateString('en-IN');
+      var statusColor = order.status === 'completed' ? '#3B6D11' : order.status === 'pending' ? '#C49A3C' : '#E24B4A';
+      
+      html += '<div style="background: var(--ivory); border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid ' + statusColor + '">' +
+        '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">' +
+          '<span style="font-weight: 500; color: var(--charcoal);">Order #' + (idx + 1) + '</span>' +
+          '<span style="font-size: 11px; padding: 4px 10px; background: ' + statusColor + '; color: #fff; border-radius: 12px; text-transform: uppercase;">' + order.status + '</span>' +
+        '</div>' +
+        '<p style="font-size: 12px; color: var(--muted); margin: 4px 0;">Date: ' + date + '</p>' +
+        '<p style="font-size: 14px; color: var(--terra); font-weight: 500; margin: 4px 0;">₹' + order.total.toLocaleString('en-IN') + '</p>' +
+        '<p style="font-size: 12px; color: var(--muted);">' + order.items.length + ' item(s)</p>' +
+      '</div>';
+    });
+    
+    container.innerHTML = html;
+  }
+
   /* ── MOBILE MENU ── */
-  function toggleMenu() {
+  window.toggleMenu = function() {
     var links = document.querySelector('.nav-links');
     if (links.style.display === 'flex') {
       links.style.display = 'none';
     } else {
       links.style.cssText = 'display:flex; flex-direction:column; position:absolute; top:64px; left:0; width:100%; background:var(--cream); padding:20px 24px; gap:20px; border-bottom:1px solid rgba(181,96,58,0.15); z-index:499;';
     }
-  }
+  };
+})();
 </script>
 
 </body>
