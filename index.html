@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
+  <meta name="theme-color" content="#F7F3ED">
+  <meta name="description" content="Heal Yourr Self — Crystals, Meditations & Healing Sessions">
+  <title>Heal Yourr Self — Crystals, Meditations & Healing Sessions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="firebase-config.js"></script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     PRODUCT DETAIL MODAL
+══════════════════════════════════ -->
+<div id="product-modal">
+  <div id="modal-box">
+    <button id="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-img-wrap">
+      <img id="modal-img" src="" alt="" style="display:none;">
+      <div id="modal-img-placeholder">◈</div>
+    </div>
+    <div id="modal-content">
+      <p id="modal-type"></p>
+      <h2 id="modal-name"></h2>
+      <p id="modal-price"></p>
+      <div id="modal-attrs"></div>
+      <p id="modal-desc"></p>
+      <p id="modal-benefits-title">Benefits</p>
+      <ul id="modal-benefits"></ul>
+      <a id="modal-buy" href="#" target="_blank">Buy Now</a>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════
+     AUTH MODAL
+══════════════════════════════════ -->
+<div id="auth-overlay">
+  <div id="auth-box">
+    <div id="auth-top">
+      <button id="auth-modal-close" onclick="closeAuthModal()">✕</button>
+      <h2>Welcome back</h2>
+      <p>Sign in to save your cart &amp; address</p>
+    </div>
+    <div id="auth-body">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-signin" onclick="switchAuthTab('signin')">Sign In</button>
+        <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+      </div>
+      <div id="auth-name-wrap" class="auth-input-group" style="display:none;">
+        <label>Your Name</label>
+        <input type="text" id="auth-name" placeholder="Full name">
+      </div>
+      <div class="auth-input-group">
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="your@email.com">
+      </div>
+      <div class="auth-input-group">
+        <label>Password</label>
+        <input type="password" id="auth-pass" placeholder="Min 6 characters">
+      </div>
+      <p id="auth-error"></p>
+      <button class="auth-submit-btn" id="auth-submit-btn" onclick="handleAuthSubmit()">Sign In</button>
+      <div class="auth-divider">or</div>
+      <button class="google-btn" onclick="signInWithGoogle()">
+        <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     PROFILE MODAL
+══════════════════════════════════ -->
+<div id="profile-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div id="profile-box">
+    <div class="profile-head">
+      <div class="profile-avatar" id="profile-avatar">👤</div>
+      <div>
+        <p class="profile-name" id="profile-display-name">My Account</p>
+        <p class="profile-email" id="profile-display-email"></p>
+      </div>
+    </div>
+    <div class="profile-section">
+      <h4>Saved Address</h4>
+      <div class="addr-grid">
+        <div class="full"><input type="text" id="addr-name" placeholder="Full name"></div>
+        <input type="tel" id="addr-phone" placeholder="Phone number">
+        <input type="text" id="addr-pincode" placeholder="Pincode">
+        <div class="full"><input type="text" id="addr-line1" placeholder="House / Street / Area"></div>
+        <input type="text" id="addr-city" placeholder="City">
+        <input type="text" id="addr-state" placeholder="State">
+      </div>
+      <button class="save-addr-btn" onclick="saveAddress()">Save Address</button>
+      <p id="addr-saved-msg">Address saved successfully ✅</p>
+    </div>
+    <div class="profile-section">
+      <h4>Order History</h4>
+      <div id="order-history-container" style="max-height: 300px; overflow-y: auto;">
+        <p style="color: var(--muted); text-align: center; padding: 20px;">Loading orders...</p>
+      </div>
+    </div>
+    <button class="signout-btn" onclick="signOutUser()">Sign Out</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     CART DRAWER
+══════════════════════════════════ -->
+<div id="cart-overlay" onclick="if(event.target===this)closeCart()">
+  <div id="cart-drawer">
+    <div id="cart-head">
+      <h3>Your Cart</h3>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="cart-count-head" style="font-size:13px;color:var(--muted);"></span>
+        <button id="cart-close-btn" onclick="closeCart()">✕</button>
+      </div>
+    </div>
+    <div id="cart-items">
+      <div id="cart-empty">
+        <div class="ei">🛒</div>
+        <p>Your cart is empty</p>
+        <button class="btn" onclick="closeCart()">Continue Shopping</button>
+      </div>
+    </div>
+    <div id="cart-footer" style="display:none;">
+      <div id="cart-summary">
+        <div class="cart-summary-row"><span>Subtotal</span><span id="cart-subtotal">₹0</span></div>
+        <div class="cart-summary-row"><span>Shipping</span><span>Free</span></div>
+        <div class="cart-summary-row total"><span>Total</span><span id="cart-total">₹0</span></div>
+      </div>
+      <button id="cart-checkout" onclick="handleCheckout()">Proceed to Checkout</button>
+      <button id="cart-continue" onclick="closeCart()">Continue Shopping</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SUBSCRIBE POPUP
+══════════════════════════════════ -->
+<div id="popup-overlay">
+  <div id="popup">
+    <div id="popup-top">
+      <button id="popup-close" aria-label="Close">✕</button>
+      <h2>Welcome, dear soul</h2>
+      <p>Join the Heal Yourr Self community — free meditations, crystal guides &amp; healing offers</p>
+    </div>
+    <div id="popup-body">
+      <p>No spam, ever. Unsubscribe anytime.</p>
+      <div class="popup-row">
+        <input type="email" id="popup-email" placeholder="Your email address" />
+        <button class="btn btn-filled" onclick="handlePopupSubscribe()">Subscribe</button>
+      </div>
+      <button id="popup-skip" onclick="closePopup()">No thanks, I'll explore first</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     NAVIGATION
+══════════════════════════════════ -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">Heal Yourr <span>Self</span></a>
+    <ul class="nav-links">
+      <li><a href="#shop">Crystals</a></li>
+      <li><a href="#meditations">Meditations</a></li>
+      <li><a href="#sessions">Healing Sessions</a></li>
+      <li><a href="#about">Our Story</a></li>
+      <li><a href="#blog">Journal</a></li>
+      <li><a href="#subscribe">Connect</a></li>
+    </ul>
+    <div class="nav-user-area">
+      <button class="cart-nav-btn" onclick="openCart()" title="Cart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+        <span id="cart-badge"></span>
+      </button>
+      <button id="nav-signin-btn" class="btn nav-cta" onclick="openAuthModal()" style="display:flex;">Sign In</button>
+      <button id="nav-user-btn" onclick="openProfileModal()" style="display:none;align-items:center;gap:8px;background:none;border:1px solid var(--ivory);padding:7px 14px;border-radius:4px;cursor:pointer;font-family:'Jost',sans-serif;font-size:13px;color:var(--charcoal);">
+        <span style="font-size:16px;">👤</span>
+        <span id="nav-user-name">Account</span>
+      </button>
+    </div>
+    <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════
+     HERO
+══════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-text">
+    <p class="section-label">Crystals · Meditations · Healing Sessions</p>
+    <h1>Heal, rise &amp; <em>transform</em> your life</h1>
+    <p>Ethically sourced crystals, powerful guided meditations and one-on-one healing sessions — everything you need to come back to yourself.</p>
+    <div class="hero-actions">
+      <a href="#sessions" class="btn btn-filled">Book a Healing Session</a>
+      <a href="#shop" class="btn">Shop Crystals</a>
+    </div>
+  </div>
+  <div class="hero-img">
+    <div class="hero-img-placeholder">
+      <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" class="leaf-icon">
+        <path d="M60 10 C60 10 20 40 20 70 C20 92 38 110 60 110 C82 110 100 92 100 70 C100 40 60 10 60 10Z" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none"/>
+        <line x1="60" y1="10" x2="60" y2="110" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+        <line x1="40" y1="50" x2="60" y2="68" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+        <line x1="80" y1="50" x2="60" y2="68" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+        <line x1="35" y1="70" x2="60" y2="84" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+        <line x1="85" y1="70" x2="60" y2="84" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="hero-badge">Heal Yourr Self — With love &amp; intention</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     FEATURES STRIP
+══════════════════════════════════ -->
+<div id="features">
+  <div class="features-row">
+    <div class="feature-item"><span class="dot"></span>Ethically Sourced Crystals</div>
+    <div class="feature-item"><span class="dot"></span>Guided Meditations MP3</div>
+    <div class="feature-item"><span class="dot"></span>1-on-1 Healing Sessions</div>
+    <div class="feature-item"><span class="dot"></span>Energy Cleansed &amp; Blessed</div>
+    <div class="feature-item"><span class="dot"></span>Worldwide Delivery</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SHOP
+══════════════════════════════════ -->
+<section id="shop">
+  <div class="container">
+    <div class="section-head">
+      <p class="section-label">Sacred Collection</p>
+      <h2>Crystals &amp; Gifts</h2>
+      <p>Every crystal is hand-picked, cleansed under the moon and charged with intention before it reaches you.</p>
+    </div>
+
+    <div class="shop-tabs">
+      <button class="shop-tab active" onclick="switchTab('all', this)">All</button>
+      <button class="shop-tab" onclick="switchTab('love', this)">Love &amp; Heart</button>
+      <button class="shop-tab" onclick="switchTab('protection', this)">Protection</button>
+      <button class="shop-tab" onclick="switchTab('abundance', this)">Abundance</button>
+      <button class="shop-tab" onclick="switchTab('spiritual', this)">Spiritual</button>
+    </div>
+
+    <div id="tab-all" class="tab-section active">
+      <div class="products-grid">
+
+        <div class="product-card" data-cat="love" onclick="openProduct('rose-quartz')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#D4537E;">♡</div>
+            <span class="product-badge">Bestseller</span>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Heart Chakra</p>
+            <h3 class="product-name">Rose Quartz Bracelet</h3>
+            <p class="product-desc">Boosts self-love, heals relationship issues, brings peace, calmness and mutual understanding.</p>
+            <div class="product-foot">
+              <span class="product-price">₹800</span>
+              <button class="add-btn" onclick="addToCart(this,'rose-quartz')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="spiritual" onclick="openProduct('amethyst')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#7F77DD;">◈</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Crown Chakra</p>
+            <h3 class="product-name">Amethyst Bracelet</h3>
+            <p class="product-desc">Improves focus, reduces insomnia, promotes hormonal balance and spiritual wisdom.</p>
+            <div class="product-foot">
+              <span class="product-price">₹900</span>
+              <button class="add-btn" onclick="addToCart(this,'amethyst')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="abundance" onclick="openProduct('citrine')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#C49A3C;">✦</div>
+            <span class="product-badge">Popular</span>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Solar Plexus</p>
+            <h3 class="product-name">Citrine Bracelet</h3>
+            <p class="product-desc">Attracts wealth, prosperity and success. Known as the merchant's stone — brings financial abundance and joy.</p>
+            <div class="product-foot">
+              <span class="product-price">₹2,000</span>
+              <button class="add-btn" onclick="addToCart(this,'citrine')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="abundance" onclick="openProduct('iron-pyrite')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#B4A030;">⬡</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Solar Plexus</p>
+            <h3 class="product-name">Iron Pyrite Bracelet</h3>
+            <p class="product-desc">Attracts wealth and abundance, offers protection, strengthens the solar plexus chakra and protects the aura.</p>
+            <div class="product-foot">
+              <span class="product-price">₹1,100</span>
+              <button class="add-btn" onclick="addToCart(this,'iron-pyrite')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="abundance" onclick="openProduct('money-magnet')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#C49A3C;">◇</div>
+            <span class="product-badge">Best Value</span>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Combination Bracelet</p>
+            <h3 class="product-name">Money Magnet Bracelet</h3>
+            <p class="product-desc">Tiger Eye + Pyrite + Citrine + Aventurine — a powerful combination to attract abundance, confidence and luck.</p>
+            <div class="product-foot">
+              <span class="product-price">₹1,100</span>
+              <button class="add-btn" onclick="addToCart(this,'money-magnet')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="protection" onclick="openProduct('triple-protection')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#444441;">◈</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Combination Bracelet</p>
+            <h3 class="product-name">Triple Protection Bracelet</h3>
+            <p class="product-desc">Tiger Eye + Black Obsidian + Hematite — shields against negativity, promotes grounding and emotional healing.</p>
+            <div class="product-foot">
+              <span class="product-price">₹1,100</span>
+              <button class="add-btn" onclick="addToCart(this,'triple-protection')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="protection" onclick="openProduct('malachite')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#1D9E75;">◉</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Heart Chakra</p>
+            <h3 class="product-name">Malachite Bracelet</h3>
+            <p class="product-desc">Most important healing stone of the new millennium. Absorbs negative energies, protects against radiation and brings transformation.</p>
+            <div class="product-foot">
+              <span class="product-price">₹2,300</span>
+              <button class="add-btn" onclick="addToCart(this,'malachite')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="spiritual" onclick="openProduct('sandstone')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#B4B2A9;">◇</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Root Chakra</p>
+            <h3 class="product-name">Sandstone Bracelet</h3>
+            <p class="product-desc">Stone of creativity and focus. Provides deep grounding energy, stabilises emotions and aids in overcoming stress.</p>
+            <div class="product-foot">
+              <span class="product-price">₹2,000</span>
+              <button class="add-btn" onclick="addToCart(this,'sandstone')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="spiritual" onclick="openProduct('tanzanite')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#378ADD;">✦</div>
+            <span class="product-badge">Premium</span>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Third Eye</p>
+            <h3 class="product-name">Tanzanite Bracelet</h3>
+            <p class="product-desc">Connects to higher consciousness, stimulates intuition and heals throat, third eye and crown chakra. Gives optimism and inspiration.</p>
+            <div class="product-foot">
+              <span class="product-price">₹4,600</span>
+              <button class="add-btn" onclick="addToCart(this,'tanzanite')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="spiritual" onclick="openProduct('azurite')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#185FA5;">◈</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Third Eye</p>
+            <h3 class="product-name">Azurite Bracelet</h3>
+            <p class="product-desc">Enlightenment, spiritual guidance and powerful healer. Expands mind, mental healing and aligns to truth.</p>
+            <div class="product-foot">
+              <span class="product-price">₹900</span>
+              <button class="add-btn" onclick="addToCart(this,'azurite')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="love" onclick="openProduct('garnet')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#D4537E;">◉</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Sacral Chakra</p>
+            <h3 class="product-name">Garnet Bracelet</h3>
+            <p class="product-desc">Powerful energising stone for women. Inspires love and devotion, opens heart and bestows self-confidence. Promotes hormonal balance.</p>
+            <div class="product-foot">
+              <span class="product-price">₹1,100</span>
+              <button class="add-btn" onclick="addToCart(this,'garnet')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="abundance" onclick="openProduct('firoza')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#5DCAA5;">◇</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Throat Chakra</p>
+            <h3 class="product-name">African Firoza Bracelet</h3>
+            <p class="product-desc">Attracts prosperity and financial opportunities. Overcomes financial crisis and results in an abundant and happy life.</p>
+            <div class="product-foot">
+              <span class="product-price">₹1,600</span>
+              <button class="add-btn" onclick="addToCart(this,'firoza')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="protection" onclick="openProduct('carnelian')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#D85A30;">◉</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Sacral Chakra</p>
+            <h3 class="product-name">Carnelian Bracelet</h3>
+            <p class="product-desc">Makes you fearless and action-oriented. Natural cleanser, brings abundance, restores vitality and aids creativity.</p>
+            <div class="product-foot">
+              <span class="product-price">₹900</span>
+              <button class="add-btn" onclick="addToCart(this,'carnelian')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="spiritual" onclick="openProduct('lapis-lazuli')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#185FA5;">⬡</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Third Eye</p>
+            <h3 class="product-name">Lapis Lazuli Bracelet</h3>
+            <p class="product-desc">Boosts immune system, awakens the third eye, purifies blood, inner power, truth and positive magic.</p>
+            <div class="product-foot">
+              <span class="product-price">₹1,000</span>
+              <button class="add-btn" onclick="addToCart(this,'lapis-lazuli')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="spiritual" onclick="openProduct('serpentine')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#1D9E75;">◇</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · All Chakras</p>
+            <h3 class="product-name">Serpentine Bracelet</h3>
+            <p class="product-desc">Opens new pathways for Kundalini energy. Earthing stone for meditation, brings wisdom and pain relief.</p>
+            <div class="product-foot">
+              <span class="product-price">₹900</span>
+              <button class="add-btn" onclick="addToCart(this,'serpentine')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="protection" onclick="openProduct('red-jasper')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#D85A30;">♡</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Root Chakra</p>
+            <h3 class="product-name">Red Jasper Bracelet</h3>
+            <p class="product-desc">Relaxation, nurturing and protection. Calming effect, detoxifies blood and circulatory system.</p>
+            <div class="product-foot">
+              <span class="product-price">₹900</span>
+              <button class="add-btn" onclick="addToCart(this,'red-jasper')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="spiritual" onclick="openProduct('labradorite')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#378ADD;">✦</div>
+            <span class="product-badge">Magical</span>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · All Chakras</p>
+            <h3 class="product-name">Labradorite Bracelet</h3>
+            <p class="product-desc">Stone of magic for healers. Awakens inner spirit, intuition and psychic abilities. Brings personal magical powers to surface.</p>
+            <div class="product-foot">
+              <span class="product-price">₹1,500</span>
+              <button class="add-btn" onclick="addToCart(this,'labradorite')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="spiritual" onclick="openProduct('ruby-zoisite')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#D4537E;">◈</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Crown Chakra</p>
+            <h3 class="product-name">Ruby Zoisite Bracelet</h3>
+            <p class="product-desc">Activates the crown chakra, facilitates soul memory and spiritual learning. Helpful in soul healing and amplifies aura.</p>
+            <div class="product-foot">
+              <span class="product-price">₹900</span>
+              <button class="add-btn" onclick="addToCart(this,'ruby-zoisite')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card" data-cat="spiritual" onclick="openProduct('green-onyx')">
+          <div class="product-img">
+            <div class="product-img-placeholder" style="color:#1D9E75;">◉</div>
+          </div>
+          <div class="product-info">
+            <p class="product-type">Bracelet · Heart Chakra</p>
+            <h3 class="product-name">Green Onyx Bracelet</h3>
+            <p class="product-desc">Strength-giving, imparts self-confidence. Improves public speaking, memory and logic. Attracts positive energy and increases courage.</p>
+            <div class="product-foot">
+              <span class="product-price">₹900</span>
+              <button class="add-btn" onclick="addToCart(this,'green-onyx')">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     ABOUT
+══════════════════════════════════ -->
+<section id="about">
+  <div class="container">
+    <div class="about-grid">
+      <div class="about-img-wrap">
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style="opacity:0.25">
+          <circle cx="40" cy="40" r="36" stroke="#6B7C5E" stroke-width="2"/>
+          <path d="M40 8 C40 8 16 28 16 48 C16 62 26 72 40 72 C54 72 64 62 64 48 C64 28 40 8 40 8Z" stroke="#6B7C5E" stroke-width="1.5" fill="none"/>
+          <line x1="40" y1="8" x2="40" y2="72" stroke="#6B7C5E" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="about-text">
+        <p class="section-label">Our Story</p>
+        <h2>Born from a deep love of <em>healing &amp; light</em></h2>
+        <p>Heal Yourr Self was born after years of personal healing — working with crystals, energy, meditation and hands-on healing sessions. We saw how many people were searching for real, grounded, accessible healing tools and guidance.</p>
+        <p>Every crystal is personally sourced and charged with intention. Every meditation is recorded from the heart. Every healing session is held with full presence and care. We believe you deserve to feel whole.</p>
+        <div class="about-stats">
+          <div class="stat">
+            <div class="stat-num">500+</div>
+            <div class="stat-label">Crystals rehomed</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">40+</div>
+            <div class="stat-label">Guided meditations</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">200+</div>
+            <div class="stat-label">Healing sessions done</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">4.9★</div>
+            <div class="stat-label">Client love</div>
+          </div>
+        </div>
+        <a href="#" class="btn">Read Our Full Story</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     MEDITATIONS
+══════════════════════════════════ -->
+<section id="meditations">
+  <div class="container">
+    <div class="section-head">
+      <p class="section-label">Audio &amp; Digital</p>
+      <h2>Guided Meditations</h2>
+      <p>Download instantly. Listen anywhere. Each track is crafted to bring you deeper into presence, healing and stillness.</p>
+    </div>
+
+    <div class="meditation-list">
+
+      <div class="meditation-card">
+        <div class="play-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+        </div>
+        <div class="med-info">
+          <p class="med-meta">14 min · Heart Chakra</p>
+          <h3 class="med-title">Opening the Heart</h3>
+          <p class="med-desc">A soft, guided journey to release old wounds and welcome love back in. Includes rose quartz visualization.</p>
+          <span class="med-price">₹199 · MP3 Download</span>
+        </div>
+      </div>
+
+      <div class="meditation-card">
+        <div class="play-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+        </div>
+        <div class="med-info">
+          <p class="med-meta">22 min · Grounding</p>
+          <h3 class="med-title">Earth Body Scan</h3>
+          <p class="med-desc">Deep grounding meditation to anchor your energy, release anxiety and feel safe in your body and home.</p>
+          <span class="med-price">₹249 · MP3 Download</span>
+        </div>
+      </div>
+
+      <div class="meditation-card">
+        <div class="play-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+        </div>
+        <div class="med-info">
+          <p class="med-meta">18 min · Sleep</p>
+          <h3 class="med-title">Crystal Sleep Journey</h3>
+          <p class="med-desc">Drift into deep, restful sleep with amethyst and moonstone visualizations woven through a soothing soundscape.</p>
+          <span class="med-price">₹199 · MP3 Download</span>
+        </div>
+      </div>
+
+      <div class="meditation-card">
+        <div class="play-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+        </div>
+        <div class="med-info">
+          <p class="med-meta">5-Album Bundle · Best Value</p>
+          <h3 class="med-title">Complete Healing Series</h3>
+          <p class="med-desc">All 5 meditation albums covering chakras, sleep, abundance, grief and daily calm. 60+ minutes of audio.</p>
+          <span class="med-price">₹799 · Full Bundle</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     HEALING SESSIONS
+══════════════════════════════════ -->
+<section id="sessions" style="padding:100px 0; background:var(--ivory);">
+  <div class="container">
+    <div class="section-head">
+      <p class="section-label">Work with me</p>
+      <h2>Healing Sessions</h2>
+      <p>Personal, one-on-one sessions held online or in person. Each session is tailored fully to you — your energy, your needs, your healing journey.</p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:28px; margin-bottom:56px;">
+
+      <div style="background:var(--white); border-radius:var(--radius); border:1px solid rgba(181,96,58,0.12); overflow:hidden;">
+        <div style="background:var(--sage); padding:28px 24px; text-align:center;">
+          <div style="font-size:32px; margin-bottom:8px; opacity:0.9;">◈</div>
+          <h3 style="color:var(--cream); font-size:24px; margin-bottom:6px;">Crystal Healing Session</h3>
+          <p style="color:#c8d6bc; font-size:13px;">60 minutes · Online or In-person</p>
+        </div>
+        <div style="padding:24px;">
+          <p style="font-size:14px; color:var(--muted); margin-bottom:16px; line-height:1.7;">A full-body crystal healing session where crystals are placed on and around your energy centres. Deep relaxation, chakra balancing and energetic clearing.</p>
+          <ul style="list-style:none; margin-bottom:20px;">
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0; border-bottom:1px solid var(--ivory);">✦ &nbsp;Full chakra assessment</li>
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0; border-bottom:1px solid var(--ivory);">✦ &nbsp;Crystal layout &amp; energy clearing</li>
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0; border-bottom:1px solid var(--ivory);">✦ &nbsp;Post-session guidance &amp; notes</li>
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0;">✦ &nbsp;Crystal recommendation for home</li>
+          </ul>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-family:'Cormorant Garamond',serif; font-size:28px; color:var(--terra);">₹1,499</span>
+            <a href="#subscribe" class="btn btn-filled" style="font-size:12px; padding:10px 20px;">Book Now</a>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--white); border-radius:var(--radius); border:2px solid var(--terra); overflow:hidden; position:relative;">
+        <div style="position:absolute; top:0; left:0; right:0; background:var(--terra); text-align:center; padding:6px; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#fff; font-weight:500;">Most Popular</div>
+        <div style="background:var(--charcoal); padding:28px 24px; text-align:center; margin-top:30px;">
+          <div style="font-size:32px; margin-bottom:8px; opacity:0.9;">☽</div>
+          <h3 style="color:var(--cream); font-size:24px; margin-bottom:6px;">Energy Healing + Meditation</h3>
+          <p style="color:#8a8880; font-size:13px;">90 minutes · Online or In-person</p>
+        </div>
+        <div style="padding:24px;">
+          <p style="font-size:14px; color:var(--muted); margin-bottom:16px; line-height:1.7;">A combined session — crystal healing followed by a deeply personalised guided meditation recorded just for you. You leave with an MP3 of your personal meditation to keep forever.</p>
+          <ul style="list-style:none; margin-bottom:20px;">
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0; border-bottom:1px solid var(--ivory);">✦ &nbsp;Full crystal healing session</li>
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0; border-bottom:1px solid var(--ivory);">✦ &nbsp;Personal guided meditation recorded for you</li>
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0; border-bottom:1px solid var(--ivory);">✦ &nbsp;MP3 of YOUR meditation to keep</li>
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0;">✦ &nbsp;Follow-up voice note within 48hrs</li>
+          </ul>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-family:'Cormorant Garamond',serif; font-size:28px; color:var(--terra);">₹2,199</span>
+            <a href="#subscribe" class="btn btn-filled" style="font-size:12px; padding:10px 20px;">Book Now</a>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--white); border-radius:var(--radius); border:1px solid rgba(181,96,58,0.12); overflow:hidden;">
+        <div style="background:#3C3489; padding:28px 24px; text-align:center;">
+          <div style="font-size:32px; margin-bottom:8px; opacity:0.9;">✦</div>
+          <h3 style="color:#EEEDFE; font-size:24px; margin-bottom:6px;">Monthly Healing Journey</h3>
+          <p style="color:#AFA9EC; font-size:13px;">4 sessions · 1 per week · Online</p>
+        </div>
+        <div style="padding:24px;">
+          <p style="font-size:14px; color:var(--muted); margin-bottom:16px; line-height:1.7;">A full month of healing support. One session per week plus unlimited WhatsApp support between sessions. Perfect if you're going through a big life change or deep emotional healing.</p>
+          <ul style="list-style:none; margin-bottom:20px;">
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0; border-bottom:1px solid var(--ivory);">✦ &nbsp;4 x 60-minute healing sessions</li>
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0; border-bottom:1px solid var(--ivory);">✦ &nbsp;WhatsApp support all month</li>
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0; border-bottom:1px solid var(--ivory);">✦ &nbsp;Personalised crystal kit posted to you</li>
+            <li style="font-size:13px; color:var(--charcoal); padding:6px 0;">✦ &nbsp;2 personal meditation MP3s</li>
+          </ul>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-family:'Cormorant Garamond',serif; font-size:28px; color:var(--terra);">₹4,999</span>
+            <a href="#subscribe" class="btn btn-filled" style="font-size:12px; padding:10px 20px;">Book Now</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Booking note -->
+    <div style="text-align:center; background:var(--white); border-radius:var(--radius); padding:28px 24px; border:1px solid rgba(181,96,58,0.12); max-width:600px; margin:0 auto;">
+      <p style="font-family:'Cormorant Garamond',serif; font-size:22px; margin-bottom:8px; color:var(--charcoal);">How to book your session</p>
+      <p style="font-size:14px; color:var(--muted); margin-bottom:20px; line-height:1.7;">Simply drop your name, session choice and preferred time in the form below and I will personally get back to you within 24 hours to confirm your booking.</p>
+      <a href="#subscribe" class="btn btn-filled">Send a Booking Request</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     BLOG
+══════════════════════════════════ -->
+<section id="blog">
+  <div class="container">
+    <div class="section-head">
+      <p class="section-label">Our Journal</p>
+      <h2>Stories, Wisdom &amp; Guides</h2>
+      <p>We share what we learn — crystal guides, meditation tips, seasonal rituals and slow living inspiration.</p>
+    </div>
+
+    <div class="blog-grid">
+
+      <div class="blog-card">
+        <div class="blog-img">
+          <div class="blog-img-placeholder">🌿</div>
+        </div>
+        <div class="blog-content">
+          <p class="blog-tag">Crystal Guide</p>
+          <h3 class="blog-title">How to Cleanse &amp; Charge Your Crystals at Home</h3>
+          <p class="blog-excerpt">A complete beginner's guide to moonlight charging, sound cleansing, salt baths and intention setting — so your crystals stay energetically clear.</p>
+          <p class="blog-date">April 2025</p>
+        </div>
+      </div>
+
+      <div class="blog-card">
+        <div class="blog-img">
+          <div class="blog-img-placeholder">☽</div>
+        </div>
+        <div class="blog-content">
+          <p class="blog-tag">Ritual</p>
+          <h3 class="blog-title">A New Moon Crystal Ritual for Intention Setting</h3>
+          <p class="blog-excerpt">Simple, powerful and deeply nourishing — do this monthly to align your energy with the lunar cycle.</p>
+          <p class="blog-date">March 2025</p>
+        </div>
+      </div>
+
+      <div class="blog-card">
+        <div class="blog-img">
+          <div class="blog-img-placeholder">✦</div>
+        </div>
+        <div class="blog-content">
+          <p class="blog-tag">Meditation</p>
+          <h3 class="blog-title">5 Grounding Practices for Anxious Times</h3>
+          <p class="blog-excerpt">Short, practical grounding techniques you can do anywhere — with or without crystals — when anxiety rises.</p>
+          <p class="blog-date">February 2025</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="text-align:center; margin-top:48px;">
+      <a href="#" class="btn">Read All Posts</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     SUBSCRIBE SECTION
+══════════════════════════════════ -->
+<section id="subscribe">
+  <div class="container">
+    <p class="section-label" style="color:#c8d6bc;">Stay connected</p>
+    <h2>Join the Heal Yourr Self circle</h2>
+    <p>Crystal guides, free meditations, healing session availability &amp; moon rituals — straight to your inbox. No spam, ever.</p>
+    <div class="subscribe-form">
+      <input type="email" id="footer-email" placeholder="Your email address" />
+      <button class="sub-form-btn" onclick="handleFooterSubscribe()">Subscribe</button>
+    </div>
+    <p id="footer-msg" style="margin-top:16px; font-size:13px; color:#c8d6bc; display:none;">You're in! Welcome to the community.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     FOOTER
+══════════════════════════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="nav-logo">Heal Yourr <span style="color:var(--terra);">Self</span></div>
+        <p>Crystals, guided meditations and one-on-one healing sessions — everything you need to come back to yourself.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Shop</h4>
+        <ul>
+          <li><a href="#shop">Crystals</a></li>
+          <li><a href="#shop">Crystal Sets</a></li>
+          <li><a href="#shop">Gift Boxes</a></li>
+          <li><a href="#meditations">Meditations</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Healing</h4>
+        <ul>
+          <li><a href="#sessions">Crystal Healing</a></li>
+          <li><a href="#sessions">Energy + Meditation</a></li>
+          <li><a href="#sessions">Monthly Journey</a></li>
+          <li><a href="#about">Our Story</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Help</h4>
+        <ul>
+          <li><a href="#">Booking Info</a></li>
+          <li><a href="#">Shipping Info</a></li>
+          <li><a href="#">Contact Us</a></li>
+          <li><a href="#">FAQ</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2025 Heal Yourr Self. Made with love &amp; intention.</p>
+      <div class="social-links">
+        <a href="#" title="Instagram">In</a>
+        <a href="#" title="Facebook">Fb</a>
+        <a href="#" title="YouTube">Yt</a>
+        <a href="#" title="Pinterest">Pt</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Load app.js -->
+<script src="app.js"></script>
+
+</body>
+</html>
