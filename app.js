@@ -1,44 +1,29 @@
 (function() {
-  /* ── PRODUCT DATA ── ORGANIZED BY CATEGORIES ── */
-  
-  // All products organized by category
-  window.productsByCategory = {
-    'love': {
-      'rose-quartz': {
-        name: 'Rose Quartz Bracelet',
-        type: 'Bracelet · Heart Chakra',
-        price: '₹800',
-        img: 'rose-quartz.jpg',
-        placeholder: '♡',
-        link: 'https://payments.cashfree.com/links?code=ea7vdg342ql0_AAAAAAASyjU',
-        attrs: { Chakra: 'Heart', Element: 'Water', Planet: 'Venus', Color: 'Pink' },
-        desc: 'The ultimate stone of love and compassion. Rose Quartz opens the heart to all kinds of love — self love, family love, romantic love and friendship.',
-        benefits: ['Boosts self-love and self-worth','Heals relationship issues and heartbreak','Brings peace, calmness and harmony','Promotes mutual understanding','Inspires compassion and kindness']
-      },
-      'garnet': {
-        name: 'Garnet Bracelet',
-        type: 'Bracelet · Sacral Chakra',
-        price: '₹1,100',
-        img: 'garnet.jpg',
-        placeholder: '◉',
-        link: '#',
-        attrs: { Chakra: 'Sacral', Element: 'Fire', Planet: 'Mars', Color: 'Deep Red' },
-        desc: 'A powerful energising and regenerating stone especially for women. Garnet cleanses and re-energises the chakras while inspiring love and devotion.',
-        benefits: ['Powerful energising stone for women','Cleanses and re-energises all chakras','Vitalises, purifies and balances energy','Inspires love and devotion','Helps let go of old and obsolete patterns','Opens heart and bestows self-confidence','Regulates blood circulation','Sharpens self-perception','Stone of commitment','Promotes hormonal balance for women']
-      }
+  /* ── PRODUCT DATA ── */
+
+  window.products = {
+    'rose-quartz': {
+      name: 'Rose Quartz Bracelet',
+      type: 'Bracelet · Heart Chakra',
+      price: '₹800',
+      img: 'rose-quartz.jpg',
+      placeholder: '♡',
+      link: 'https://payments.cashfree.com/links?code=ea7vdg342ql0_AAAAAAASyjU',
+      attrs: { Chakra: 'Heart', Element: 'Water', Planet: 'Venus', Color: 'Pink' },
+      desc: 'The ultimate stone of love and compassion. Rose Quartz opens the heart to all kinds of love — self love, family love, romantic love and friendship.',
+      benefits: ['Boosts self-love and self-worth','Heals relationship issues and heartbreak','Brings peace, calmness and harmony','Promotes mutual understanding','Inspires compassion and kindness']
     },
-    'spiritual': {
-      'amethyst': {
-        name: 'Amethyst Bracelet',
-        type: 'Bracelet · Crown Chakra',
-        price: '₹900',
-        img: 'amethyst.jpg',
-        placeholder: '◈',
-        link: '#',
-        attrs: { Chakra: 'Crown', Element: 'Air', Planet: 'Jupiter', Color: 'Purple' },
-        desc: 'A powerful and protective stone with a high spiritual vibration. Amethyst is a natural tranquiliser that relieves stress and strain.',
-        benefits: ['Improves focus, concentration and decision making','Brings success, serenity and new opportunities','Reduces insomnia and promotes deep sleep','Promotes hormonal balance','Powerful protective stone','Encourages selflessness and spiritual wisdom','Strengthens immune system']
-      },
+    'garnet': {
+      name: 'Garnet Bracelet',
+      type: 'Bracelet · Sacral Chakra',
+      price: '₹1,100',
+      img: 'garnet.jpg',
+      placeholder: '◉',
+      link: '#',
+      attrs: { Chakra: 'Sacral', Element: 'Fire', Planet: 'Mars', Color: 'Deep Red' },
+      desc: 'A powerful energising and regenerating stone especially for women. Garnet cleanses and re-energises the chakras while inspiring love and devotion.',
+      benefits: ['Powerful energising stone for women','Cleanses and re-energises all chakras','Vitalises, purifies and balances energy','Inspires love and devotion','Helps let go of old and obsolete patterns','Opens heart and bestows self-confidence','Regulates blood circulation','Sharpens self-perception','Stone of commitment','Promotes hormonal balance for women']
+    },
     'amethyst': {
       name: 'Amethyst Bracelet',
       type: 'Bracelet · Crown Chakra',
@@ -137,17 +122,6 @@
       attrs: { Chakra: 'Third Eye', Element: 'Water', Planet: 'Jupiter', Color: 'Deep Blue' },
       desc: 'A stone of enlightenment and spiritual guidance. Azurite expands the mind and deepens your connection to spiritual truth.',
       benefits: ['Brings enlightenment and awakening','Provides spiritual guidance','Powerful physical and emotional healer','Expands the mind and consciousness','Supports mental healing and clarity','Instils bravery and courage','Aligns you to your truth','Deep emotional healing']
-    },
-    'garnet': {
-      name: 'Garnet Bracelet',
-      type: 'Bracelet · Sacral Chakra',
-      price: '₹1,100',
-      img: 'garnet.jpg',
-      placeholder: '◉',
-      link: '#',
-      attrs: { Chakra: 'Sacral', Element: 'Fire', Planet: 'Mars', Color: 'Deep Red' },
-      desc: 'A powerful energising and regenerating stone especially for women. Garnet cleanses and re-energises the chakras while inspiring love and devotion.',
-      benefits: ['Powerful energising stone for women','Cleanses and re-energises all chakras','Vitalises, purifies and balances energy','Inspires love and devotion','Helps let go of old and obsolete patterns','Opens heart and bestows self-confidence','Regulates blood circulation','Sharpens self-perception','Stone of commitment','Promotes hormonal balance for women']
     },
     'firoza': {
       name: 'African Firoza Bracelet',
@@ -394,7 +368,7 @@
     var subtotal = 0;
     items.forEach(function(item, idx) {
       subtotal += item.priceNum * item.qty;
-      var imgHtml = '<div class="cart-item-img"><img src="'+item.img+'" alt="'+item.name+'" onerror="this.style.display=\\"none\\";this.nextSibling.style.display=\\"block\\""><span style="display:none;">'+item.placeholder+'</span></div>';
+      var imgHtml = '<div class="cart-item-img"><img src="'+item.img+'" alt="'+item.name+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'block\'"><span style="display:none;">'+item.placeholder+'</span></div>';
       html += '<div class="cart-item">' + imgHtml +
         '<div class="cart-item-info">' +
           '<p class="cart-item-name">'+item.name+'</p>' +
