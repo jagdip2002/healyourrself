@@ -2,6 +2,8 @@
 
 A beautiful, modern e-commerce website for crystals, meditations, and healing sessions.
 
+🔗 **Live Demo**: https://healyourrself.com
+
 ## Features
 
 ✨ **Product Catalog** - Browse and shop ethically-sourced crystals  
