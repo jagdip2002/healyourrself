@@ -213,8 +213,11 @@
     }
   };
 
+  var currentProductKey = null;
+  
   /* ── OPEN MODAL ── */
   window.openProduct = function(key) {
+    currentProductKey = key;
     var p = products[key];
     if (!p) return;
     document.getElementById('modal-type').textContent = p.type;
@@ -243,7 +246,7 @@
 
     var buyBtn = document.getElementById('modal-buy');
     buyBtn.href = p.link;
-    buyBtn.textContent = 'Buy Now — ' + p.price;
+    buyBtn.textContent = 'Buy Now';
 
     document.getElementById('product-modal').classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -262,6 +265,26 @@
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeModal();
   });
+  
+  // Prevent Add to Cart clicks from propagating to parent product card
+  document.addEventListener('click', function(e) {
+    // Stop propagation for buttons to prevent parent card click
+    if (e.target.classList.contains('add-btn') || e.target.closest('button')) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+    }
+  }, true);
+  
+  // Add event listener to product cards to prevent openProduct when clicking buttons
+  document.addEventListener('click', function(e) {
+    const card = e.target.closest('.product-card');
+    if (card && (e.target.classList.contains('add-btn') || e.target.closest('button'))) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return false;
+    }
+  }, true);
+  
   // Show popup after 2 seconds (skip if already subscribed this session)
   window.addEventListener('load', function () {
     if (!sessionStorage.getItem('subscribed')) {
@@ -326,7 +349,7 @@
   window.cartItems = [];
 
   window.addToCart = function(btn, key) {
-    if (!window.currentUser) { openAuthModal(); return; }
+    // This function is no longer used - kept for compatibility
     var p = products[key];
     if (!p) return;
     var existing = window.cartItems.find(function(i){ return i.key===key; });
@@ -335,12 +358,36 @@
     } else {
       window.cartItems.push({ key: key, name: p.name, type: p.type, price: p.price, priceNum: parseInt(p.price.replace(/[^0-9]/g,'')), img: p.img, placeholder: p.placeholder, qty: 1 });
     }
-    btn.textContent = 'Added ✓';
-    btn.style.background = 'var(--sage)'; btn.style.color='#fff'; btn.style.borderColor='var(--sage)';
-    setTimeout(function(){ btn.textContent='Add to Cart'; btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }, 1800);
     renderCart();
     if (window.saveCartToFirebase) window.saveCartToFirebase();
     openCart();
+  }
+
+  window.addToCartFromModal = function() {
+    if (!currentProductKey) return;
+    var key = currentProductKey;
+    var p = products[key];
+    if (!p) return;
+    
+    // Add to cart directly (no auth needed)
+    var existing = window.cartItems.find(function(i){ return i.key===key; });
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      window.cartItems.push({ key: key, name: p.name, type: p.type, price: p.price, priceNum: parseInt(p.price.replace(/[^0-9]/g,'')), img: p.img, placeholder: p.placeholder, qty: 1 });
+    }
+    
+    // Show success
+    var btn = document.getElementById('modal-add-cart');
+    btn.textContent = 'Added to Cart ✓';
+    btn.style.background = 'var(--sage)';
+    setTimeout(function(){
+      btn.textContent = 'Add to Cart';
+      btn.style.background = '';
+    }, 1500);
+    
+    renderCart();
+    if (window.saveCartToFirebase) window.saveCartToFirebase();
   }
 
   window.renderCart = function() {
@@ -487,15 +534,19 @@
 
   /* ── AUTH MODAL ── */
   window.openAuthModal = function() {
+    var productModal = document.getElementById('product-modal');
+    productModal.classList.add('hidden');
     document.getElementById('auth-overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
   }
 
   window.closeAuthModal = function() {
+    var productModal = document.getElementById('product-modal');
+    productModal.classList.remove('hidden');
     document.getElementById('auth-overlay').classList.remove('open');
     document.body.style.overflow = '';
   }
-
+display = 'flex
   document.getElementById('auth-overlay').addEventListener('click', function(e){ if(e.target===this) closeAuthModal(); });
 
   window.switchAuthTab = function(tab) {

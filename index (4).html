@@ -631,11 +631,20 @@
     /* ── PRODUCT DETAIL MODAL ── */
     #product-modal {
       position: fixed; inset: 0; z-index: 2000;
-      background: rgba(44,43,40,0.7);
+      background: rgba(44,43,40,0);
       display: none; align-items: center; justify-content: center;
       padding: 20px;
+      transition: background 0.35s;
     }
     #product-modal.open { display: flex; }
+    #product-modal.open { background: rgba(44,43,40,0.7); }
+    @keyframes modalSlideUp {
+      from { opacity: 0; transform: translateY(48px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0)   scale(1);    }
+    }
+    #product-modal.open #modal-box {
+      animation: modalSlideUp 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    }
     #modal-box {
       background: var(--white);
       border-radius: var(--radius);
@@ -645,7 +654,10 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       position: relative;
+      opacity: 0;
     }
+    /* hide add-to-cart buttons on product cards in the main grid */
+    .add-btn { display: none !important; }
     #modal-close {
       position: absolute; top: 14px; right: 16px; z-index: 10;
       background: rgba(44,43,40,0.5); border: none;
@@ -707,7 +719,10 @@
       <p id="modal-desc"></p>
       <p id="modal-benefits-title">Benefits</p>
       <ul id="modal-benefits"></ul>
-      <a id="modal-buy" href="#" target="_blank">Buy Now</a>
+      <div id="modal-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px;">
+        <button id="modal-add-cart" onclick="addToCartFromModal()" style="display: block; width: 100%; padding: 12px; background: var(--sage); color: #fff; border: none; border-radius: 4px; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; font-family: 'Jost', sans-serif; font-weight: 500; text-align: center; transition: background 0.3s;">Add to Cart</button>
+        <button id="modal-buy" onclick="buyNowFromModal()" style="display: flex; align-items: center; justify-content: center; width: 100%; padding: 12px; background: var(--terra); color: #fff; border: none; border-radius: 4px; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; font-family: 'Jost', sans-serif; font-weight: 500; text-align: center; transition: background 0.2s;">Buy Now</button>
+      </div>
     </div>
   </div>
 </div>
@@ -942,10 +957,7 @@
             <p class="product-type">Bracelet · Heart Chakra</p>
             <h3 class="product-name">Rose Quartz Bracelet</h3>
             <p class="product-desc">Boosts self-love, heals relationship issues, brings peace, calmness and mutual understanding.</p>
-            <div class="product-foot">
-              <span class="product-price">₹800</span>
-              <button class="add-btn" onclick="addToCart(this,'rose-quartz')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹800</span></div>
           </div>
         </div>
 
@@ -957,10 +969,7 @@
             <p class="product-type">Bracelet · Crown Chakra</p>
             <h3 class="product-name">Amethyst Bracelet</h3>
             <p class="product-desc">Improves focus, reduces insomnia, promotes hormonal balance and spiritual wisdom.</p>
-            <div class="product-foot">
-              <span class="product-price">₹900</span>
-              <button class="add-btn" onclick="addToCart(this,'amethyst')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹900</span></div>
           </div>
         </div>
 
@@ -973,10 +982,7 @@
             <p class="product-type">Bracelet · Solar Plexus</p>
             <h3 class="product-name">Citrine Bracelet</h3>
             <p class="product-desc">Attracts wealth, prosperity and success. Known as the merchant's stone — brings financial abundance and joy.</p>
-            <div class="product-foot">
-              <span class="product-price">₹2,000</span>
-              <button class="add-btn" onclick="addToCart(this,'citrine')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹2,000</span></div>
           </div>
         </div>
 
@@ -988,10 +994,7 @@
             <p class="product-type">Bracelet · Solar Plexus</p>
             <h3 class="product-name">Iron Pyrite Bracelet</h3>
             <p class="product-desc">Attracts wealth and abundance, offers protection, strengthens the solar plexus chakra and protects the aura.</p>
-            <div class="product-foot">
-              <span class="product-price">₹1,100</span>
-              <button class="add-btn" onclick="addToCart(this,'iron-pyrite')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹1,100</span></div>
           </div>
         </div>
 
@@ -1004,10 +1007,7 @@
             <p class="product-type">Combination Bracelet</p>
             <h3 class="product-name">Money Magnet Bracelet</h3>
             <p class="product-desc">Tiger Eye + Pyrite + Citrine + Aventurine — a powerful combination to attract abundance, confidence and luck.</p>
-            <div class="product-foot">
-              <span class="product-price">₹1,100</span>
-              <button class="add-btn" onclick="addToCart(this,'money-magnet')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹1,100</span></div>
           </div>
         </div>
 
@@ -1019,10 +1019,7 @@
             <p class="product-type">Combination Bracelet</p>
             <h3 class="product-name">Triple Protection Bracelet</h3>
             <p class="product-desc">Tiger Eye + Black Obsidian + Hematite — shields against negativity, promotes grounding and emotional healing.</p>
-            <div class="product-foot">
-              <span class="product-price">₹1,100</span>
-              <button class="add-btn" onclick="addToCart(this,'triple-protection')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹1,100</span></div>
           </div>
         </div>
 
@@ -1034,10 +1031,7 @@
             <p class="product-type">Bracelet · Heart Chakra</p>
             <h3 class="product-name">Malachite Bracelet</h3>
             <p class="product-desc">Most important healing stone of the new millennium. Absorbs negative energies, protects against radiation and brings transformation.</p>
-            <div class="product-foot">
-              <span class="product-price">₹2,300</span>
-              <button class="add-btn" onclick="addToCart(this,'malachite')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹2,300</span></div>
           </div>
         </div>
 
@@ -1049,10 +1043,7 @@
             <p class="product-type">Bracelet · Root Chakra</p>
             <h3 class="product-name">Sandstone Bracelet</h3>
             <p class="product-desc">Stone of creativity and focus. Provides deep grounding energy, stabilises emotions and aids in overcoming stress.</p>
-            <div class="product-foot">
-              <span class="product-price">₹2,000</span>
-              <button class="add-btn" onclick="addToCart(this,'sandstone')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹2,000</span></div>
           </div>
         </div>
 
@@ -1065,10 +1056,7 @@
             <p class="product-type">Bracelet · Third Eye</p>
             <h3 class="product-name">Tanzanite Bracelet</h3>
             <p class="product-desc">Connects to higher consciousness, stimulates intuition and heals throat, third eye and crown chakra. Gives optimism and inspiration.</p>
-            <div class="product-foot">
-              <span class="product-price">₹4,600</span>
-              <button class="add-btn" onclick="addToCart(this,'tanzanite')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹4,600</span></div>
           </div>
         </div>
 
@@ -1080,10 +1068,7 @@
             <p class="product-type">Bracelet · Third Eye</p>
             <h3 class="product-name">Azurite Bracelet</h3>
             <p class="product-desc">Enlightenment, spiritual guidance and powerful healer. Expands mind, mental healing and aligns to truth.</p>
-            <div class="product-foot">
-              <span class="product-price">₹900</span>
-              <button class="add-btn" onclick="addToCart(this,'azurite')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹900</span></div>
           </div>
         </div>
 
@@ -1095,10 +1080,7 @@
             <p class="product-type">Bracelet · Sacral Chakra</p>
             <h3 class="product-name">Garnet Bracelet</h3>
             <p class="product-desc">Powerful energising stone for women. Inspires love and devotion, opens heart and bestows self-confidence. Promotes hormonal balance.</p>
-            <div class="product-foot">
-              <span class="product-price">₹1,100</span>
-              <button class="add-btn" onclick="addToCart(this,'garnet')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹1,100</span></div>
           </div>
         </div>
 
@@ -1110,10 +1092,7 @@
             <p class="product-type">Bracelet · Throat Chakra</p>
             <h3 class="product-name">African Firoza Bracelet</h3>
             <p class="product-desc">Attracts prosperity and financial opportunities. Overcomes financial crisis and results in an abundant and happy life.</p>
-            <div class="product-foot">
-              <span class="product-price">₹1,600</span>
-              <button class="add-btn" onclick="addToCart(this,'firoza')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹1,600</span></div>
           </div>
         </div>
 
@@ -1125,10 +1104,7 @@
             <p class="product-type">Bracelet · Sacral Chakra</p>
             <h3 class="product-name">Carnelian Bracelet</h3>
             <p class="product-desc">Makes you fearless and action-oriented. Natural cleanser, brings abundance, restores vitality and aids creativity.</p>
-            <div class="product-foot">
-              <span class="product-price">₹900</span>
-              <button class="add-btn" onclick="addToCart(this,'carnelian')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹900</span></div>
           </div>
         </div>
 
@@ -1140,10 +1116,7 @@
             <p class="product-type">Bracelet · Third Eye</p>
             <h3 class="product-name">Lapis Lazuli Bracelet</h3>
             <p class="product-desc">Boosts immune system, awakens the third eye, purifies blood, inner power, truth and positive magic.</p>
-            <div class="product-foot">
-              <span class="product-price">₹1,000</span>
-              <button class="add-btn" onclick="addToCart(this,'lapis-lazuli')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹1,000</span></div>
           </div>
         </div>
 
@@ -1155,10 +1128,7 @@
             <p class="product-type">Bracelet · All Chakras</p>
             <h3 class="product-name">Serpentine Bracelet</h3>
             <p class="product-desc">Opens new pathways for Kundalini energy. Earthing stone for meditation, brings wisdom and pain relief.</p>
-            <div class="product-foot">
-              <span class="product-price">₹900</span>
-              <button class="add-btn" onclick="addToCart(this,'serpentine')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹900</span></div>
           </div>
         </div>
 
@@ -1170,10 +1140,7 @@
             <p class="product-type">Bracelet · Root Chakra</p>
             <h3 class="product-name">Red Jasper Bracelet</h3>
             <p class="product-desc">Relaxation, nurturing and protection. Calming effect, detoxifies blood and circulatory system.</p>
-            <div class="product-foot">
-              <span class="product-price">₹900</span>
-              <button class="add-btn" onclick="addToCart(this,'red-jasper')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹900</span></div>
           </div>
         </div>
 
@@ -1186,10 +1153,7 @@
             <p class="product-type">Bracelet · All Chakras</p>
             <h3 class="product-name">Labradorite Bracelet</h3>
             <p class="product-desc">Stone of magic for healers. Awakens inner spirit, intuition and psychic abilities. Brings personal magical powers to surface.</p>
-            <div class="product-foot">
-              <span class="product-price">₹1,500</span>
-              <button class="add-btn" onclick="addToCart(this,'labradorite')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹1,500</span></div>
           </div>
         </div>
 
@@ -1201,10 +1165,7 @@
             <p class="product-type">Bracelet · Crown Chakra</p>
             <h3 class="product-name">Ruby Zoisite Bracelet</h3>
             <p class="product-desc">Activates the crown chakra, facilitates soul memory and spiritual learning. Helpful in soul healing and amplifies aura.</p>
-            <div class="product-foot">
-              <span class="product-price">₹900</span>
-              <button class="add-btn" onclick="addToCart(this,'ruby-zoisite')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹900</span></div>
           </div>
         </div>
 
@@ -1216,10 +1177,7 @@
             <p class="product-type">Bracelet · Heart Chakra</p>
             <h3 class="product-name">Green Onyx Bracelet</h3>
             <p class="product-desc">Strength-giving, imparts self-confidence. Improves public speaking, memory and logic. Attracts positive energy and increases courage.</p>
-            <div class="product-foot">
-              <span class="product-price">₹900</span>
-              <button class="add-btn" onclick="addToCart(this,'green-onyx')">Add to Cart</button>
-            </div>
+            <div class="product-foot"><span class="product-price">₹900</span></div>
           </div>
         </div>
 
@@ -1228,8 +1186,7 @@
   </div>
 </section>
 
-<!-- ══════════════════════════════════
-     ABOUT
+<!-- ═══════
 ══════════════════════════════════ -->
 <section id="about">
   <div class="container">
@@ -1768,6 +1725,8 @@
   window.openProduct = function(key) {
     var p = products[key];
     if (!p) return;
+    window._currentProductKey = key;
+
     document.getElementById('modal-type').textContent = p.type;
     document.getElementById('modal-name').textContent = p.name;
     document.getElementById('modal-price').textContent = p.price;
@@ -1793,11 +1752,56 @@
     document.getElementById('modal-benefits').innerHTML = benefitsHtml;
 
     var buyBtn = document.getElementById('modal-buy');
-    buyBtn.href = p.link;
     buyBtn.textContent = 'Buy Now — ' + p.price;
+    buyBtn.style.background = 'var(--terra)';
 
-    document.getElementById('product-modal').classList.add('open');
+    // reset add-cart button
+    var addCartBtn = document.getElementById('modal-add-cart');
+    addCartBtn.textContent = 'Add to Cart';
+    addCartBtn.style.background = 'var(--sage)';
+
+    var modal = document.getElementById('product-modal');
+    // reset animation by removing/re-adding class
+    modal.classList.remove('open');
+    void modal.offsetWidth; // reflow
+    modal.classList.add('open');
     document.body.style.overflow = 'hidden';
+  }
+
+  /* ── ADD TO CART FROM MODAL (sign-in required) ── */
+  window.addToCartFromModal = function() {
+    if (!window.currentUser) { openAuthModal(); return; }
+    var key = window._currentProductKey;
+    var p = products[key];
+    if (!p) return;
+    var existing = window.cartItems.find(function(i){ return i.key === key; });
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      window.cartItems.push({ key: key, name: p.name, type: p.type, price: p.price, priceNum: parseInt(p.price.replace(/[^0-9]/g,'')), img: p.img, placeholder: p.placeholder, qty: 1 });
+    }
+    renderCart();
+    if (window.saveCartToFirebase) window.saveCartToFirebase();
+    var btn = document.getElementById('modal-add-cart');
+    btn.textContent = 'Added ✓';
+    btn.style.background = '#3B6D11';
+    setTimeout(function(){ btn.textContent = 'Add to Cart'; btn.style.background = 'var(--sage)'; }, 1800);
+  }
+
+  /* ── BUY NOW FROM MODAL — add to cart then go to checkout ── */
+  window.buyNowFromModal = function() {
+    var key = window._currentProductKey;
+    var p = products[key];
+    if (!p) return;
+    // Add item to cart (1 qty) replacing any existing
+    var existing = window.cartItems.find(function(i){ return i.key === key; });
+    if (!existing) {
+      window.cartItems.push({ key: key, name: p.name, type: p.type, price: p.price, priceNum: parseInt(p.price.replace(/[^0-9]/g,'')), img: p.img, placeholder: p.placeholder, qty: 1 });
+    }
+    renderCart();
+    if (window.saveCartToFirebase) window.saveCartToFirebase();
+    closeModal();
+    handleCheckout();
   }
 
   /* ── CLOSE MODAL ── */
