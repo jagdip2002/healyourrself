@@ -1,0 +1,2522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0"/>
+  <meta name="theme-color" content="#F7F3ED"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <title>Heal Yourr Self — Crystals, Meditations & Healing Sessions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey: "AIzaSyAkvqa2JG7VPcu11WR4FYIJxOx4Lw--bS4",
+      authDomain: "heal-yourr-self.firebaseapp.com",
+      projectId: "heal-yourr-self",
+      storageBucket: "heal-yourr-self.firebasestorage.app",
+      messagingSenderId: "934808740053",
+      appId: "1:934808740053:web:3488cf085764a7d14f825c"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+    window._auth = auth; window._db = db; window._provider = provider;
+    window._signInWithPopup = signInWithPopup;
+    window._createUser = createUserWithEmailAndPassword;
+    window._signIn = signInWithEmailAndPassword;
+    window._signOut = signOut;
+    window._doc = doc; window._setDoc = setDoc; window._getDoc = getDoc;
+    onAuthStateChanged(auth, async function(user) {
+      window.currentUser = user || null;
+      var signinBtn = document.getElementById('nav-signin-btn');
+      var userBtn = document.getElementById('nav-user-btn');
+      var userName = document.getElementById('nav-user-name');
+      if (user) {
+        if (signinBtn) signinBtn.style.display = 'none';
+        if (userBtn) userBtn.style.display = 'flex';
+        if (userName) userName.textContent = (user.displayName || user.email).split(' ')[0];
+        var snap = await getDoc(doc(db, 'users', user.uid));
+        window.cartItems = (snap.exists() && snap.data().cart) ? snap.data().cart : [];
+        renderCart();
+      } else {
+        if (signinBtn) signinBtn.style.display = 'flex';
+        if (userBtn) userBtn.style.display = 'none';
+        window.cartItems = [];
+        renderCart();
+      }
+    });
+    window.saveCartToFirebase = async function() {
+      if (!window.currentUser) return;
+      await setDoc(doc(db, 'users', window.currentUser.uid), { cart: window.cartItems }, { merge: true });
+    };
+    window.sendOrderConfirmationEmail = async function(orderData) {
+      try {
+        await fetch('https://us-central1-heal-yourr-self.cloudfunctions.net/sendOrderEmail', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orderData)
+        });
+      } catch(e) { console.log('Email notification queued:', e.message); }
+    };
+    window.signInWithGoogle = async function() {
+      try {
+        var result = await signInWithPopup(auth, provider);
+        await setDoc(doc(db, 'users', result.user.uid), { name: result.user.displayName, email: result.user.email, photo: result.user.photoURL }, { merge: true });
+        closeAuthModal();
+      } catch(e) { document.getElementById('auth-error').textContent = e.message; }
+    };
+    window.signUpEmail = async function() {
+      var name = document.getElementById('auth-name').value.trim();
+      var email = document.getElementById('auth-email').value.trim();
+      var pass = document.getElementById('auth-pass').value;
+      if (!name||!email||!pass) { document.getElementById('auth-error').textContent = 'Please fill all fields'; return; }
+      if (pass.length < 6) { document.getElementById('auth-error').textContent = 'Password must be at least 6 characters'; return; }
+      try {
+        var result = await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db, 'users', result.user.uid), { name, email, createdAt: new Date().toISOString() }, { merge: true });
+        closeAuthModal();
+      } catch(e) { document.getElementById('auth-error').textContent = e.message; }
+    };
+    window.signInEmail = async function() {
+      var email = document.getElementById('auth-email').value.trim();
+      var pass = document.getElementById('auth-pass').value;
+      if (!email||!pass) { document.getElementById('auth-error').textContent = 'Please fill all fields'; return; }
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        closeAuthModal();
+      } catch(e) { document.getElementById('auth-error').textContent = 'Wrong email or password'; }
+    };
+    window.signOutUser = async function() {
+      await signOut(auth);
+      document.getElementById('profile-modal').classList.remove('open');
+    };
+    window.saveAddress = async function() {
+      if (!window.currentUser) { alert('Please sign in first'); return; }
+      var addr = {
+        name: document.getElementById('addr-name').value,
+        phone: document.getElementById('addr-phone').value,
+        line1: document.getElementById('addr-line1').value,
+        city: document.getElementById('addr-city').value,
+        state: document.getElementById('addr-state').value,
+        pincode: document.getElementById('addr-pincode').value
+      };
+      await setDoc(doc(db, 'users', window.currentUser.uid), { address: addr }, { merge: true });
+      document.getElementById('addr-saved-msg').style.display = 'block';
+      setTimeout(function(){ document.getElementById('addr-saved-msg').style.display='none'; }, 2500);
+    };
+    window.loadAddress = async function() {
+      if (!window.currentUser) return;
+      var snap = await getDoc(doc(db, 'users', window.currentUser.uid));
+      if (snap.exists() && snap.data().address) {
+        var a = snap.data().address;
+        document.getElementById('addr-name').value = a.name||'';
+        document.getElementById('addr-phone').value = a.phone||'';
+        document.getElementById('addr-line1').value = a.line1||'';
+        document.getElementById('addr-city').value = a.city||'';
+        document.getElementById('addr-state').value = a.state||'';
+        document.getElementById('addr-pincode').value = a.pincode||'';
+      }
+    };
+  </script>
+
+  <style>
+    /* ══ RESET & BASE ══ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cream:    #F7F3ED;
+      --ivory:    #EDE6DA;
+      --terra:    #B5603A;
+      --terra-lt: #D4896A;
+      --sage:     #6B7C5E;
+      --sage-lt:  #9AAE8A;
+      --charcoal: #2C2B28;
+      --muted:    #7A7569;
+      --gold:     #C49A3C;
+      --white:    #FDFAF6;
+      --radius:   12px;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Jost', sans-serif;
+      background: var(--cream);
+      color: var(--charcoal);
+      font-size: 16px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ══ GRAIN TEXTURE OVERLAY ══ */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.028;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-size: 256px 256px;
+    }
+
+    h1,h2,h3,h4 { font-family: 'Cormorant Garamond', serif; font-weight: 400; line-height: 1.15; }
+    img { display: block; width: 100%; object-fit: cover; }
+    a { color: inherit; text-decoration: none; }
+    .container { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+    .section-label {
+      font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--terra); font-family: 'Jost', sans-serif; font-weight: 500; margin-bottom: 14px;
+    }
+
+    /* ══ BUTTONS ══ */
+    .btn {
+      display: inline-block; padding: 13px 30px;
+      border: 1.5px solid var(--terra); color: var(--terra);
+      font-family: 'Jost', sans-serif; font-size: 12px; letter-spacing: 2px;
+      text-transform: uppercase; cursor: pointer; background: transparent;
+      transition: background 0.3s, color 0.3s, transform 0.2s; border-radius: 2px;
+    }
+    .btn:hover { background: var(--terra); color: var(--white); transform: translateY(-1px); }
+    .btn-filled { background: var(--terra); color: var(--white); }
+    .btn-filled:hover { background: #9a4f2e; }
+
+    /* ══ SCROLL REVEAL ══ */
+    .reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.7s ease, transform 0.7s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-left { opacity: 0; transform: translateX(-40px); transition: opacity 0.7s ease, transform 0.7s ease; }
+    .reveal-left.visible { opacity: 1; transform: translateX(0); }
+    .reveal-right { opacity: 0; transform: translateX(40px); transition: opacity 0.7s ease, transform 0.7s ease; }
+    .reveal-right.visible { opacity: 1; transform: translateX(0); }
+
+    /* ══ SUBSCRIBE POPUP ══ */
+    #popup-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(44,43,40,0.65); backdrop-filter: blur(6px);
+      display: none; align-items: center; justify-content: center;
+    }
+    #popup-overlay.show { display: flex; }
+    #popup {
+      background: var(--white); width: 500px; max-width: 94vw;
+      border-radius: 16px; overflow: hidden;
+      transform: translateY(20px) scale(0.97);
+      transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), opacity 0.3s;
+      opacity: 0;
+    }
+    #popup-overlay.show #popup { transform: translateY(0) scale(1); opacity: 1; }
+    #popup-top {
+      background: linear-gradient(135deg, var(--sage) 0%, #4a5c3e 100%);
+      padding: 40px 36px 32px; text-align: center; position: relative;
+    }
+    #popup-top h2 { color: var(--cream); font-size: 34px; margin-bottom: 8px; font-style: italic; }
+    #popup-top p { color: #c8d6bc; font-size: 14px; font-family: 'Jost', sans-serif; }
+    #popup-close {
+      position: absolute; top: 14px; right: 16px;
+      background: rgba(255,255,255,0.15); border: none;
+      color: #fff; width: 30px; height: 30px;
+      border-radius: 50%; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    #popup-close:hover { background: rgba(255,255,255,0.3); }
+    #popup-body { padding: 32px 36px 36px; }
+    #popup-body p { font-size: 14px; color: var(--muted); margin-bottom: 20px; text-align: center; }
+    .popup-row { display: flex; gap: 10px; }
+    .popup-row input {
+      flex: 1; padding: 13px 16px;
+      border: 1.5px solid #d4cec4; border-radius: 4px;
+      font-family: 'Jost', sans-serif; font-size: 14px;
+      background: var(--cream); color: var(--charcoal); outline: none;
+      transition: border-color 0.2s;
+    }
+    .popup-row input:focus { border-color: var(--sage); }
+    #popup-skip {
+      display: block; text-align: center; margin-top: 16px;
+      font-size: 12px; color: var(--muted); cursor: pointer;
+      text-decoration: underline; background: none; border: none;
+    }
+    #popup-success { text-align: center; padding: 20px 0 8px; }
+    #popup-success .check { width: 52px; height: 52px; border-radius: 50%; background: #e8f0e4; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; }
+    #popup-success h3 { font-size: 24px; margin-bottom: 6px; }
+    #popup-success p { font-size: 14px; color: var(--muted); }
+
+    /* ══ NAV ══ */
+    nav {
+      position: fixed; top: 0; width: 100%; z-index: 500;
+      background: rgba(247,243,237,0.92);
+      backdrop-filter: blur(16px) saturate(180%);
+      border-bottom: 1px solid rgba(181,96,58,0.12);
+      transition: background 0.3s;
+    }
+    nav.scrolled { background: rgba(247,243,237,0.98); box-shadow: 0 1px 24px rgba(44,43,40,0.06); }
+    .nav-inner { max-width: 1160px; margin: 0 auto; padding: 0 24px; height: 68px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 22px; letter-spacing: 1px; color: var(--charcoal); }
+    .nav-logo span { color: var(--terra); }
+    .nav-links { display: flex; gap: 32px; list-style: none; }
+    .nav-links a { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); font-weight: 500; transition: color 0.2s; position: relative; }
+    .nav-links a::after { content: ''; position: absolute; bottom: -3px; left: 0; width: 0; height: 1px; background: var(--terra); transition: width 0.3s; }
+    .nav-links a:hover::after { width: 100%; }
+    .nav-links a:hover { color: var(--terra); }
+    .hamburger { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
+    .hamburger span { width: 22px; height: 1.5px; background: var(--charcoal); display: block; transition: all 0.3s; }
+    .nav-user-area { display: flex; align-items: center; gap: 12px; }
+    .cart-nav-btn { position: relative; background: none; border: none; cursor: pointer; padding: 8px; display: flex; align-items: center; gap: 6px; color: var(--charcoal); transition: color 0.2s; }
+    .cart-nav-btn:hover { color: var(--terra); }
+    #cart-badge { position: absolute; top: 0; right: 0; background: var(--terra); color: #fff; width: 18px; height: 18px; border-radius: 50%; font-size: 10px; font-weight: 700; display: none; align-items: center; justify-content: center; }
+    #cart-badge.visible { display: flex; }
+
+    /* ══ HERO ══ */
+    #hero {
+      padding-top: 68px; min-height: 100vh;
+      display: grid; grid-template-columns: 1fr 1fr; align-items: center;
+    }
+    .hero-text {
+      padding: 100px 56px 100px 24px; max-width: 600px;
+      animation: heroTextIn 1s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    @keyframes heroTextIn { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+    .hero-label { animation-delay: 0s; }
+    .hero-text h1 {
+      font-size: clamp(44px, 5.5vw, 76px); font-style: italic; margin-bottom: 24px;
+      color: var(--charcoal); line-height: 1.08;
+      animation: heroTextIn 1s 0.1s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .hero-text h1 em { color: var(--terra); }
+    .hero-text > p {
+      color: var(--muted); font-size: 16px; max-width: 420px; margin-bottom: 40px;
+      animation: heroTextIn 1s 0.2s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .hero-actions {
+      display: flex; gap: 14px; flex-wrap: wrap;
+      animation: heroTextIn 1s 0.3s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .hero-img {
+      height: 100vh; background: var(--sage);
+      position: relative; overflow: hidden;
+    }
+    .hero-img img { height: 100%; object-fit: cover; opacity: 0.88; animation: kenBurns 12s ease-in-out infinite alternate; }
+    @keyframes kenBurns { from { transform: scale(1); } to { transform: scale(1.06); } }
+    .hero-img-placeholder {
+      width: 100%; height: 100%;
+      background: linear-gradient(160deg, #5a6e4e 0%, #8a9e7a 50%, #4a5c3e 100%);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hero-badge {
+      position: absolute; bottom: 40px; left: -1px;
+      background: var(--terra); color: var(--white);
+      padding: 16px 32px; border-radius: 0 var(--radius) var(--radius) 0;
+      font-family: 'Cormorant Garamond', serif; font-size: 17px; font-style: italic;
+      animation: badgeSlide 1s 0.8s cubic-bezier(0.16,1,0.3,1) both;
+      letter-spacing: 0.5px;
+    }
+    @keyframes badgeSlide { from { opacity: 0; transform: translateX(-100%); } to { opacity: 1; transform: translateX(0); } }
+    .hero-decor-num {
+      position: absolute; top: 30%; right: 32px;
+      font-family: 'Cormorant Garamond', serif; font-size: 200px; font-style: italic;
+      color: rgba(255,255,255,0.04); line-height: 1; pointer-events: none;
+      animation: heroTextIn 1.5s 0.5s ease both;
+    }
+
+    /* ══ FEATURES STRIP ══ */
+    #features { background: var(--charcoal); padding: 22px 0; overflow: hidden; }
+    .features-track {
+      display: flex; gap: 0; justify-content: center; flex-wrap: wrap;
+    }
+    .feature-item {
+      padding: 14px 40px; border-right: 1px solid rgba(255,255,255,0.08);
+      color: var(--ivory); font-size: 11px; letter-spacing: 2.5px;
+      text-transform: uppercase; font-weight: 500; text-align: center;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .feature-item:last-child { border-right: none; }
+    .feature-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--terra); flex-shrink: 0; }
+
+    /* ══ SHOP ══ */
+    #shop { padding: 120px 0; position: relative; }
+    #shop::before {
+      content: attr(data-num);
+      position: absolute; top: 40px; left: -20px;
+      font-family: 'Cormorant Garamond', serif; font-size: 200px; font-style: italic;
+      opacity: 0.025; color: var(--terra); line-height: 1; pointer-events: none;
+    }
+    .section-head { text-align: center; margin-bottom: 64px; }
+    .section-head h2 { font-size: clamp(36px, 4.5vw, 58px); margin-bottom: 16px; }
+    .section-head p { color: var(--muted); max-width: 500px; margin: 0 auto; font-size: 15px; line-height: 1.8; }
+    .section-head .pull-quote {
+      font-family: 'Cormorant Garamond', serif; font-size: 20px; font-style: italic;
+      color: var(--terra); margin: 20px auto 0; max-width: 500px;
+      padding: 16px 0; border-top: 1px solid rgba(181,96,58,0.2); border-bottom: 1px solid rgba(181,96,58,0.2);
+    }
+
+    .shop-tabs {
+      display: flex; gap: 0; justify-content: center;
+      margin-bottom: 56px; border-bottom: 1px solid rgba(181,96,58,0.2);
+    }
+    .shop-tab {
+      padding: 12px 28px; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--muted); cursor: pointer; border: none; background: none;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      font-family: 'Jost', sans-serif; font-weight: 500; transition: all 0.25s;
+    }
+    .shop-tab.active { color: var(--terra); border-bottom-color: var(--terra); }
+    .shop-tab:hover { color: var(--terra); }
+
+    .products-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px;
+    }
+    @media (max-width: 900px) { .products-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .products-grid { grid-template-columns: 1fr; } }
+
+    /* Product card — crystal glow effect */
+    .product-card {
+      background: var(--white); border-radius: 14px; overflow: hidden;
+      border: 1.5px solid rgba(181,96,58,0.15);
+      box-shadow: 0 2px 16px rgba(181,96,58,0.06);
+      transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s ease;
+      cursor: pointer; position: relative;
+    }
+    .product-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 48px var(--card-glow, rgba(181,96,58,0.18));
+    }
+    /* Shimmer sweep on hover */
+    .product-card::before {
+      content: ''; position: absolute; inset: 0; z-index: 2;
+      background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%);
+      transform: translateX(-100%); transition: transform 0s; pointer-events: none;
+      border-radius: 14px;
+    }
+    .product-card:hover::before { transform: translateX(200%); transition: transform 0.7s ease; }
+
+    .product-img {
+      height: 280px;
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 14px 14px 0 0;
+    }
+    .product-img img {
+      position: absolute; inset: 0;
+      width: 100% !important; height: 100% !important;
+      object-fit: cover !important;
+      transition: transform 0.6s cubic-bezier(0.16,1,0.3,1);
+      display: block !important; z-index: 1;
+    }
+    .product-card:hover .product-img img { transform: scale(1.08); }
+    .product-img-placeholder {
+      display: none;
+      position: absolute; inset: 0; z-index: 2;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px;
+      border-radius: 14px 14px 0 0;
+    }
+    .extra-crystal { display: none !important; }
+    .extra-crystal.expanded { display: block !important; }
+    .product-img-placeholder .ph-symbol { font-size: 56px; opacity: 0.75; line-height: 1; }
+    .product-img-placeholder .ph-name { font-family: 'Cormorant Garamond', serif; font-size: 16px; font-style: italic; opacity: 0.65; text-align: center; padding: 0 12px; line-height: 1.3; }
+    .product-badge {
+      position: absolute; top: 12px; right: 12px;
+      background: var(--terra); color: #fff;
+      font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 2px; z-index: 3;
+    }
+    .product-info { padding: 20px 22px 22px; }
+    .product-type { font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--sage); margin-bottom: 6px; }
+    .product-name { font-family: 'Cormorant Garamond', serif; font-size: 21px; margin-bottom: 8px; }
+    .product-desc { font-size: 13px; color: var(--muted); margin-bottom: 18px; line-height: 1.65; }
+    .product-foot { display: flex; align-items: center; justify-content: space-between; }
+    .product-price { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--terra); }
+    .add-btn {
+      padding: 8px 18px; font-size: 11px; letter-spacing: 1px;
+      text-transform: uppercase; border: 1.5px solid var(--terra);
+      color: var(--terra); background: none; cursor: pointer; border-radius: 2px;
+      font-family: 'Jost', sans-serif; transition: all 0.25s;
+    }
+    .add-btn:hover { background: var(--terra); color: #fff; }
+    .buy-btn {
+      padding: 8px 18px; font-size: 11px; letter-spacing: 1px;
+      text-transform: uppercase; border: none;
+      color: #fff; background: var(--terra); cursor: pointer; border-radius: 2px;
+      font-family: 'Jost', sans-serif; transition: all 0.25s;
+    }
+    .buy-btn:hover { background: #9a4f2e; }
+    .tab-section { display: none; }
+    .tab-section.active { display: block; }
+
+    /* ══ CRYSTAL QUIZ ══ */
+    #crystal-quiz {
+      padding: 120px 0;
+      background: linear-gradient(160deg, var(--charcoal) 0%, #1e1d1b 100%);
+      position: relative; overflow: hidden;
+    }
+    #crystal-quiz::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 100%, rgba(181,96,58,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .quiz-wrap { max-width: 680px; margin: 0 auto; text-align: center; }
+    .quiz-wrap .section-label { color: var(--terra-lt); }
+    .quiz-wrap h2 { color: var(--cream); font-size: clamp(32px, 4vw, 52px); margin-bottom: 16px; font-style: italic; }
+    .quiz-wrap > p { color: #8a8880; font-size: 15px; margin-bottom: 48px; line-height: 1.8; }
+
+    .quiz-step { display: none; }
+    .quiz-step.active { display: block; }
+    .quiz-question { color: var(--ivory); font-family: 'Cormorant Garamond', serif; font-size: 26px; font-style: italic; margin-bottom: 32px; line-height: 1.4; }
+    .quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 32px; }
+    .quiz-option {
+      background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 18px 20px; cursor: pointer;
+      color: var(--ivory); font-size: 14px; font-family: 'Jost', sans-serif;
+      transition: all 0.25s; text-align: left;
+    }
+    .quiz-option:hover { background: rgba(181,96,58,0.15); border-color: rgba(181,96,58,0.5); color: var(--cream); }
+    .quiz-option.selected { background: rgba(181,96,58,0.2); border-color: var(--terra); color: var(--cream); }
+    .quiz-option strong { display: block; font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+    .quiz-option span { font-size: 12px; color: #7a7569; }
+    .quiz-next {
+      padding: 14px 36px; background: var(--terra); color: #fff;
+      border: none; border-radius: 2px; font-size: 12px; letter-spacing: 2px;
+      text-transform: uppercase; cursor: pointer; font-family: 'Jost', sans-serif;
+      font-weight: 500; transition: background 0.25s, transform 0.2s;
+    }
+    .quiz-next:hover { background: #9a4f2e; transform: translateY(-2px); }
+    .quiz-progress {
+      display: flex; gap: 8px; justify-content: center; margin-bottom: 40px;
+    }
+    .quiz-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.15); transition: background 0.3s; }
+    .quiz-dot.active { background: var(--terra); }
+    .quiz-result { text-align: center; }
+    .quiz-result-inner {
+      background: rgba(255,255,255,0.06); border: 1.5px solid rgba(181,96,58,0.3);
+      border-radius: 16px; padding: 40px; max-width: 520px; margin: 0 auto;
+    }
+    .quiz-result h3 { color: var(--cream); font-size: 32px; font-style: italic; margin-bottom: 8px; }
+    .quiz-result-num { color: var(--terra-lt); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; }
+    .quiz-result p { color: #9a9890; font-size: 14px; line-height: 1.8; margin-bottom: 28px; }
+    .quiz-crystals-list { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 28px; }
+    .quiz-crystal-chip {
+      background: rgba(181,96,58,0.2); color: var(--terra-lt);
+      border: 1px solid rgba(181,96,58,0.3); border-radius: 20px;
+      padding: 6px 16px; font-size: 13px; font-family: 'Jost', sans-serif;
+    }
+    #quiz-loading { color: var(--ivory); font-family: 'Cormorant Garamond', serif; font-size: 22px; font-style: italic; padding: 40px 0; }
+
+    /* ══ TESTIMONIALS MARQUEE ══ */
+    #testimonials { padding: 80px 0; overflow: hidden; background: var(--ivory); position: relative; }
+    #testimonials::before { content: attr(data-num); position: absolute; top: 10px; left: 0; font-family: 'Cormorant Garamond', serif; font-size: 180px; font-style: italic; opacity: 0.035; color: var(--terra); line-height: 1; pointer-events: none; }
+    #testimonials .section-label { text-align: center; margin-bottom: 12px; }
+    #testimonials h2 { text-align: center; font-size: clamp(28px, 3.5vw, 44px); margin-bottom: 48px; }
+
+    .marquee-wrap { overflow: hidden; margin-bottom: 16px; mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent); }
+    .marquee-track { display: flex; gap: 20px; animation: marquee 40s linear infinite; }
+    .marquee-track-rev { animation: marqueeRev 38s linear infinite; }
+    @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @keyframes marqueeRev { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+    .marquee-track:hover, .marquee-track-rev:hover { animation-play-state: paused; }
+    .tcard {
+      background: var(--white); border-radius: 12px;
+      border: 1px solid rgba(181,96,58,0.12);
+      padding: 22px 24px; min-width: 300px; max-width: 300px; flex-shrink: 0;
+    }
+    .tcard-stars { color: var(--gold); font-size: 14px; letter-spacing: 2px; margin-bottom: 12px; }
+    .tcard-text { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-style: italic; color: var(--charcoal); margin-bottom: 16px; line-height: 1.6; }
+    .tcard-author { font-size: 12px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    .tcard-crystal { font-size: 11px; color: var(--terra); margin-top: 2px; }
+
+    /* ══ CHAKRA GUIDE ══ */
+    #chakra-guide {
+      padding: 120px 0;
+      background: var(--charcoal);
+      position: relative; overflow: hidden;
+    }
+    #chakra-guide::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 70% 80% at 70% 50%, rgba(107,124,94,0.12) 0%, transparent 65%); pointer-events: none; }
+    .chakra-inner { display: grid; grid-template-columns: 1fr 1.2fr; gap: 80px; align-items: center; }
+    .chakra-intro .section-label { color: var(--terra-lt); }
+    .chakra-intro h2 { color: var(--cream); font-size: clamp(30px, 3.5vw, 48px); font-style: italic; margin-bottom: 16px; }
+    .chakra-intro > p { color: #8a8880; font-size: 15px; line-height: 1.8; margin-bottom: 32px; }
+    .chakra-list { display: flex; flex-direction: column; gap: 10px; }
+    .chakra-item {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 18px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+      cursor: pointer; transition: all 0.25s; background: rgba(255,255,255,0.03);
+    }
+    .chakra-item:hover, .chakra-item.active { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); }
+    .chakra-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .chakra-item-name { font-family: 'Cormorant Garamond', serif; font-size: 18px; color: var(--ivory); flex: 1; }
+    .chakra-item-crystal { font-size: 11px; color: #6a6960; text-transform: uppercase; letter-spacing: 1.5px; }
+    .chakra-detail {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px; padding: 40px; min-height: 360px;
+      display: flex; flex-direction: column; justify-content: center;
+      transition: all 0.3s;
+    }
+    .chakra-detail-color { width: 20px; height: 20px; border-radius: 50%; margin-bottom: 20px; }
+    .chakra-detail h3 { color: var(--cream); font-size: 30px; font-style: italic; margin-bottom: 8px; }
+    .chakra-detail-sub { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #6a6960; margin-bottom: 16px; }
+    .chakra-detail p { color: #8a8880; font-size: 14px; line-height: 1.8; margin-bottom: 24px; }
+    .chakra-crystals { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chakra-crystal-tag {
+      background: rgba(181,96,58,0.15); color: var(--terra-lt);
+      border: 1px solid rgba(181,96,58,0.25); border-radius: 20px;
+      padding: 5px 14px; font-size: 12px; cursor: pointer; transition: all 0.2s;
+    }
+    .chakra-crystal-tag:hover { background: rgba(181,96,58,0.3); }
+
+    /* ══ RITUAL GUIDE ══ */
+    #ritual-guide { padding: 120px 0; background: var(--cream); position: relative; }
+    #ritual-guide::before { content: attr(data-num); position: absolute; top: 30px; right: 0; font-family: 'Cormorant Garamond', serif; font-size: 200px; font-style: italic; opacity: 0.025; color: var(--charcoal); line-height: 1; pointer-events: none; }
+    .ritual-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 64px; }
+    @media (max-width: 700px) { .ritual-steps { grid-template-columns: 1fr; } }
+    .ritual-step { text-align: center; padding: 40px 32px; background: var(--white); border-radius: 16px; border: 1px solid rgba(181,96,58,0.1); position: relative; overflow: hidden; transition: transform 0.3s, box-shadow 0.3s; }
+    .ritual-step:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(181,96,58,0.12); }
+    .ritual-step-num {
+      font-family: 'Cormorant Garamond', serif; font-size: 80px; font-style: italic;
+      color: rgba(181,96,58,0.08); line-height: 1; position: absolute; top: 10px; left: 20px;
+    }
+    .ritual-icon { font-size: 36px; margin-bottom: 20px; opacity: 0.8; }
+    .ritual-step h3 { font-family: 'Cormorant Garamond', serif; font-size: 26px; margin-bottom: 12px; font-style: italic; }
+    .ritual-step p { font-size: 14px; color: var(--muted); line-height: 1.8; }
+
+    /* ══ ABOUT ══ */
+    #about { background: var(--ivory); padding: 120px 0; position: relative; overflow: hidden; }
+    .about-grid { display: grid; grid-template-columns: 55fr 45fr; gap: 80px; align-items: center; }
+    .about-img-wrap {
+      height: 520px; background: var(--sage-lt);
+      border-radius: var(--radius); overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .about-img-wrap::after {
+      content: ''; position: absolute;
+      inset: 16px -16px -16px 16px;
+      border: 2px solid rgba(181,96,58,0.25);
+      border-radius: var(--radius); z-index: -1;
+    }
+    .about-img-wrap img { height: 100%; object-fit: cover; }
+    .about-text h2 { font-size: clamp(30px, 3.5vw, 48px); margin-bottom: 24px; }
+    .about-text h2 em { color: var(--terra); }
+    .about-text > p { color: var(--muted); margin-bottom: 16px; font-size: 15px; line-height: 1.9; }
+    .about-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 36px 0; }
+    .stat { border-left: 2px solid var(--terra); padding-left: 18px; }
+    .stat-num { font-family: 'Cormorant Garamond', serif; font-size: 40px; color: var(--terra); line-height: 1; margin-bottom: 4px; }
+    .stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+
+    /* ══ MEDITATIONS ══ */
+    #meditations { padding: 120px 0; background: var(--charcoal); }
+    #meditations .section-head h2 { color: var(--ivory); }
+    #meditations .section-head p { color: #8a8880; }
+    #meditations .section-label { color: var(--terra-lt); }
+    .meditation-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+    .meditation-card {
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius); padding: 26px;
+      display: flex; gap: 20px; align-items: flex-start;
+      transition: background 0.25s, transform 0.25s;
+    }
+    .meditation-card:hover { background: rgba(255,255,255,0.09); transform: translateY(-3px); }
+    .play-btn {
+      width: 50px; height: 50px; border-radius: 50%;
+      background: var(--terra); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background 0.2s, transform 0.2s;
+    }
+    .play-btn:hover { background: var(--terra-lt); transform: scale(1.08); }
+    .play-btn svg { margin-left: 3px; }
+    .med-title { font-family: 'Cormorant Garamond', serif; font-size: 21px; color: var(--ivory); margin-bottom: 4px; }
+    .med-meta { font-size: 11px; color: #6a6960; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+    .med-desc { font-size: 13px; color: #8a8880; line-height: 1.65; margin-bottom: 14px; }
+    .med-price { font-family: 'Cormorant Garamond', serif; font-size: 21px; color: var(--gold); }
+
+    /* ══ HEALING SESSIONS ══ */
+    #sessions { padding: 120px 0; background: var(--ivory); position: relative; overflow: hidden; }
+    #sessions::before { content: attr(data-num); position: absolute; top: 30px; left: -10px; font-family: 'Cormorant Garamond', serif; font-size: 200px; font-style: italic; opacity: 0.025; color: var(--terra); line-height: 1; pointer-events: none; }
+    .sessions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 28px; margin-bottom: 56px; }
+    .session-card {
+      background: var(--white); border-radius: 16px;
+      border: 1.5px solid rgba(181,96,58,0.12); overflow: hidden;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .session-card:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(181,96,58,0.14); }
+    .session-card.featured { border-color: var(--terra); border-width: 2px; }
+    .session-badge-bar {
+      background: var(--terra); text-align: center;
+      padding: 7px; font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+      color: #fff; font-weight: 500;
+    }
+    .session-head { padding: 28px 24px; text-align: center; }
+    .session-icon { font-size: 34px; margin-bottom: 10px; opacity: 0.9; }
+    .session-head h3 { font-size: 24px; margin-bottom: 6px; }
+    .session-head p { font-size: 13px; }
+    .session-body { padding: 24px; }
+    .session-body > p { font-size: 14px; color: var(--muted); margin-bottom: 18px; line-height: 1.8; }
+    .session-features { list-style: none; margin-bottom: 24px; }
+    .session-features li { font-size: 13px; color: var(--charcoal); padding: 7px 0; border-bottom: 1px solid var(--ivory); display: flex; gap: 10px; align-items: flex-start; }
+    .session-foot { display: flex; align-items: center; justify-content: space-between; }
+    .session-price { font-family: 'Cormorant Garamond', serif; font-size: 30px; color: var(--terra); }
+
+    /* ══ BLOG ══ */
+    #blog { padding: 120px 0; }
+    .blog-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 24px; }
+    .blog-card { border-radius: 14px; overflow: hidden; background: var(--white); border: 1px solid rgba(181,96,58,0.1); transition: transform 0.3s, box-shadow 0.3s; }
+    .blog-card:hover { transform: translateY(-5px); box-shadow: 0 14px 36px rgba(181,96,58,0.12); }
+    .blog-img { height: 240px; background: var(--ivory); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .blog-img-placeholder { font-size: 64px; opacity: 0.2; transition: opacity 0.3s, transform 0.4s; }
+    .blog-card:hover .blog-img-placeholder { opacity: 0.35; transform: scale(1.05); }
+    .blog-card:first-child .blog-img { height: 340px; }
+    .blog-content { padding: 22px; }
+    .blog-tag { font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--terra); margin-bottom: 10px; }
+    .blog-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; margin-bottom: 10px; line-height: 1.3; }
+    .blog-card:first-child .blog-title { font-size: 28px; }
+    .blog-excerpt { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 14px; }
+    .blog-date { font-size: 11px; color: #aaa9a3; letter-spacing: 1px; }
+
+    /* ══ SUBSCRIBE SECTION ══ */
+    #subscribe { background: linear-gradient(135deg, var(--sage) 0%, #4a5c3e 100%); padding: 90px 0; text-align: center; position: relative; overflow: hidden; }
+    #subscribe::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 100%, rgba(181,96,58,0.2) 0%, transparent 60%); pointer-events: none; }
+    #subscribe h2 { font-size: clamp(30px, 4vw, 52px); color: var(--cream); margin-bottom: 14px; font-style: italic; }
+    #subscribe p { color: #c8d6bc; font-size: 15px; margin-bottom: 36px; line-height: 1.8; max-width: 500px; margin-left: auto; margin-right: auto; }
+    .subscribe-form { display: flex; gap: 12px; max-width: 500px; margin: 0 auto; }
+    .subscribe-form input {
+      flex: 1; padding: 14px 18px;
+      border: 1.5px solid rgba(255,255,255,0.25); border-radius: 4px;
+      background: rgba(255,255,255,0.12); color: var(--white);
+      font-family: 'Jost', sans-serif; font-size: 14px; outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .subscribe-form input::placeholder { color: rgba(255,255,255,0.45); }
+    .subscribe-form input:focus { border-color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.18); }
+    .sub-form-btn {
+      padding: 14px 28px; background: var(--terra); color: #fff;
+      border: none; border-radius: 4px; font-size: 12px; letter-spacing: 2px;
+      text-transform: uppercase; cursor: pointer; font-family: 'Jost', sans-serif;
+      font-weight: 500; white-space: nowrap; transition: background 0.25s, transform 0.2s;
+    }
+    .sub-form-btn:hover { background: #9a4f2e; transform: translateY(-1px); }
+
+    /* ══ FOOTER ══ */
+    footer { background: var(--charcoal); padding: 70px 0 32px; color: #8a8880; }
+    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 56px; }
+    .footer-brand .nav-logo { font-size: 26px; color: var(--ivory); margin-bottom: 14px; display: block; }
+    .footer-brand p { font-size: 13px; line-height: 1.8; max-width: 240px; }
+    .footer-col h4 { font-family: 'Cormorant Garamond', serif; font-size: 19px; color: var(--ivory); margin-bottom: 18px; }
+    .footer-col ul { list-style: none; }
+    .footer-col ul li { margin-bottom: 10px; }
+    .footer-col ul a { font-size: 13px; color: #8a8880; transition: color 0.2s; }
+    .footer-col ul a:hover { color: var(--terra-lt); }
+    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.06); padding-top: 28px; display: flex; justify-content: space-between; align-items: center; }
+    .footer-bottom p { font-size: 12px; }
+    .social-links { display: flex; gap: 12px; }
+    .social-links a { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 12px; color: #8a8880; transition: all 0.25s; }
+    .social-links a:hover { border-color: var(--terra); color: var(--terra-lt); }
+
+    /* ══ CART ══ */
+    #cart-overlay { position:fixed;inset:0;z-index:3000;background:rgba(44,43,40,0.55);display:none;justify-content:flex-end;backdrop-filter:blur(4px); }
+    #cart-overlay.open { display:flex; }
+    #cart-drawer { background:var(--white);width:420px;max-width:100vw;height:100vh;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.4s cubic-bezier(.4,0,.2,1); }
+    #cart-overlay.open #cart-drawer { transform:translateX(0); }
+    #cart-head { padding:22px 24px;border-bottom:1px solid var(--ivory);display:flex;align-items:center;justify-content:space-between;flex-shrink:0; }
+    #cart-head h3 { font-family:'Cormorant Garamond',serif;font-size:24px; }
+    #cart-close-btn { background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1;transition:color 0.2s; }
+    #cart-close-btn:hover { color:var(--terra); }
+    #cart-items { flex:1;overflow-y:auto;padding:12px 24px; }
+    #cart-empty { text-align:center;padding:60px 20px; }
+    #cart-empty .ei { font-size:48px;opacity:0.2;margin-bottom:16px; }
+    #cart-empty p { color:var(--muted);font-size:15px;margin-bottom:20px; }
+    .cart-item { display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--ivory);align-items:flex-start; }
+    .cart-item-img { width:72px;height:72px;border-radius:8px;background:var(--ivory);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:26px;opacity:0.5; }
+    .cart-item-img img { width:100%;height:100%;object-fit:cover;opacity:1; }
+    .cart-item-info { flex:1;min-width:0; }
+    .cart-item-name { font-family:'Cormorant Garamond',serif;font-size:18px;margin-bottom:2px; }
+    .cart-item-type { font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px; }
+    .cart-item-bottom { display:flex;align-items:center;justify-content:space-between; }
+    .cart-item-price { font-family:'Cormorant Garamond',serif;font-size:19px;color:var(--terra); }
+    .cart-qty { display:flex;align-items:center;gap:8px; }
+    .qty-btn { width:27px;height:27px;border-radius:50%;border:1px solid var(--ivory);background:none;cursor:pointer;font-size:16px;color:var(--charcoal);display:flex;align-items:center;justify-content:center;transition:all 0.15s; }
+    .qty-btn:hover { border-color:var(--terra);color:var(--terra); }
+    .qty-num { font-size:14px;font-weight:500;min-width:16px;text-align:center; }
+    .cart-item-remove { background:none;border:none;color:#ccc;cursor:pointer;font-size:16px;padding:4px;transition:color 0.15s;flex-shrink:0; }
+    .cart-item-remove:hover { color:#E24B4A; }
+    #cart-footer { padding:22px 24px;border-top:1px solid var(--ivory);flex-shrink:0; }
+    .cart-summary-row { display:flex;justify-content:space-between;font-size:14px;color:var(--muted);margin-bottom:6px; }
+    .cart-summary-row.total { font-size:19px;font-weight:500;color:var(--charcoal);margin-top:12px;padding-top:12px;border-top:1px solid var(--ivory); }
+    .cart-summary-row.total span:last-child { color:var(--terra);font-family:'Cormorant Garamond',serif;font-size:24px; }
+    #cart-checkout { display:block;width:100%;padding:15px;background:var(--terra);color:#fff;border:none;border-radius:4px;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:'Jost',sans-serif;font-weight:500;transition:background 0.2s;margin-bottom:10px; }
+    #cart-checkout:hover { background:#9a4f2e; }
+    #cart-continue { display:block;width:100%;padding:12px;background:none;border:1px solid var(--ivory);color:var(--muted);border-radius:4px;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;font-family:'Jost',sans-serif;transition:all 0.2s; }
+    #cart-continue:hover { border-color:var(--terra);color:var(--terra); }
+
+    /* ══ PRODUCT DETAIL MODAL ══ */
+    #product-modal { position:fixed;inset:0;z-index:2000;background:rgba(44,43,40,0.75);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px; }
+    #product-modal.open { display:flex; }
+    #modal-box { background:var(--white);border-radius:18px;width:920px;max-width:100%;max-height:90vh;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;position:relative;animation:modalIn 0.4s cubic-bezier(0.16,1,0.3,1); }
+    @keyframes modalIn { from { opacity:0;transform:scale(0.95) translateY(20px); } to { opacity:1;transform:scale(1) translateY(0); } }
+    #modal-close { position:absolute;top:14px;right:16px;z-index:10;background:rgba(44,43,40,0.5);border:none;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:background 0.2s; }
+    #modal-close:hover { background:var(--terra); }
+    #modal-img-wrap { height:100%;min-height:480px;background:var(--ivory);display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:18px 0 0 18px;position:relative; }
+    #modal-img-wrap img { width:100%;height:100%;object-fit:cover; }
+    #modal-img-placeholder { font-size:80px;opacity:0.25;display:flex;align-items:center;justify-content:center;width:100%;height:100%; }
+    #modal-content { padding:40px 36px;overflow-y:auto; }
+    #modal-type { font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--terra);margin-bottom:8px;font-weight:500; }
+    #modal-name { font-family:'Cormorant Garamond',serif;font-size:36px;margin-bottom:6px;line-height:1.15; }
+    #modal-price { font-family:'Cormorant Garamond',serif;font-size:30px;color:var(--terra);margin-bottom:22px; }
+    #modal-desc { font-size:14px;color:var(--muted);margin-bottom:22px;line-height:1.8; }
+    #modal-benefits-title { font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--charcoal);font-weight:500;margin-bottom:14px; }
+    #modal-benefits { list-style:none;margin-bottom:28px; }
+    #modal-benefits li { font-size:14px;color:var(--charcoal);padding:8px 0;border-bottom:1px solid var(--ivory);display:flex;gap:10px; }
+    #modal-benefits li span.dot-b { width:6px;height:6px;border-radius:50%;background:var(--terra);flex-shrink:0;margin-top:9px; }
+    #modal-attrs { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px; }
+    .modal-attr { background:var(--ivory);border-radius:8px;padding:10px 14px; }
+    .modal-attr-label { font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px; }
+    .modal-attr-value { font-size:14px;color:var(--charcoal);font-weight:500; }
+    #modal-buy { display:block;flex:1;padding:14px;background:var(--terra);color:#fff;border:none;border-radius:4px;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;font-family:'Jost',sans-serif;font-weight:500;text-align:center;transition:background 0.2s;text-decoration:none; }
+    #modal-buy:hover { background:#9a4f2e; }
+    @media (max-width:700px) { #modal-box { grid-template-columns:1fr; } #modal-img-wrap { min-height:280px;border-radius:18px 18px 0 0; } }
+
+    /* ══ AUTH MODAL ══ */
+    #auth-overlay { position:fixed;inset:0;z-index:4000;background:rgba(44,43,40,0.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:20px; }
+    #auth-overlay.open { display:flex; }
+    #auth-box { background:var(--white);border-radius:16px;width:440px;max-width:100%;overflow:hidden;animation:modalIn 0.35s cubic-bezier(0.16,1,0.3,1); }
+    #auth-top { background:linear-gradient(135deg,var(--sage) 0%,#4a5c3e 100%);padding:36px 28px 26px;text-align:center;position:relative; }
+    #auth-top h2 { color:var(--cream);font-size:30px;margin-bottom:6px;font-style:italic; }
+    #auth-top p { color:#c8d6bc;font-size:13px; }
+    #auth-modal-close { position:absolute;top:12px;right:14px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:background 0.2s; }
+    #auth-modal-close:hover { background:rgba(255,255,255,0.3); }
+    #auth-body { padding:26px 28px 30px; }
+    .auth-tabs { display:flex;border-bottom:1px solid var(--ivory);margin-bottom:22px; }
+    .auth-tab { flex:1;padding:10px;text-align:center;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:'Jost',sans-serif;font-weight:500;transition:all 0.2s; }
+    .auth-tab.active { color:var(--terra);border-bottom-color:var(--terra); }
+    .auth-input-group { margin-bottom:14px; }
+    .auth-input-group label { display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px; }
+    .auth-input-group input { width:100%;padding:12px 14px;border:1.5px solid var(--ivory);border-radius:4px;font-family:'Jost',sans-serif;font-size:14px;background:var(--cream);color:var(--charcoal);outline:none;transition:border-color 0.2s; }
+    .auth-input-group input:focus { border-color:var(--sage); }
+    #auth-error { color:#E24B4A;font-size:13px;margin-bottom:10px;min-height:18px; }
+    .auth-submit-btn { width:100%;padding:14px;background:var(--terra);color:#fff;border:none;border-radius:4px;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:'Jost',sans-serif;font-weight:500;margin-bottom:14px;transition:background 0.2s; }
+    .auth-submit-btn:hover { background:#9a4f2e; }
+    .auth-divider { text-align:center;font-size:12px;color:var(--muted);margin-bottom:14px;position:relative; }
+    .auth-divider::before,.auth-divider::after { content:'';position:absolute;top:50%;width:40%;height:1px;background:var(--ivory); }
+    .auth-divider::before { left:0; } .auth-divider::after { right:0; }
+    .google-btn { width:100%;padding:13px;border:1.5px solid var(--ivory);border-radius:4px;background:var(--white);color:var(--charcoal);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'Jost',sans-serif;transition:border-color 0.2s; }
+    .google-btn:hover { border-color:var(--sage); }
+    .google-icon { width:18px;height:18px; }
+
+    /* ══ PROFILE MODAL ══ */
+    #profile-modal { position:fixed;inset:0;z-index:4000;background:rgba(44,43,40,0.65);backdrop-filter:blur(4px);display:none;align-items:flex-start;justify-content:flex-end;padding:78px 20px 20px; }
+    #profile-modal.open { display:flex; }
+    #profile-box { background:var(--white);border-radius:16px;width:360px;max-width:100%;border:1px solid var(--ivory);max-height:calc(100vh - 100px);overflow-y:auto; }
+    .profile-head { padding:20px 20px 16px;border-bottom:1px solid var(--ivory);display:flex;align-items:center;gap:12px; }
+    .profile-avatar { width:46px;height:46px;border-radius:50%;background:var(--sage);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:500;flex-shrink:0;overflow:hidden; }
+    .profile-avatar img { width:100%;height:100%;object-fit:cover; }
+    .profile-name { font-family:'Cormorant Garamond',serif;font-size:19px; }
+    .profile-email { font-size:12px;color:var(--muted); }
+    .profile-section { padding:16px 20px;border-bottom:1px solid var(--ivory); }
+    .profile-section h4 { font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--terra);margin-bottom:14px; }
+    .addr-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+    .addr-grid .full { grid-column:1/-1; }
+    .addr-grid input { width:100%;padding:9px 12px;border:1.5px solid var(--ivory);border-radius:4px;font-size:13px;font-family:'Jost',sans-serif;background:var(--cream);color:var(--charcoal);outline:none;transition:border-color 0.2s; }
+    .addr-grid input:focus { border-color:var(--sage); }
+    .save-addr-btn { margin-top:12px;width:100%;padding:10px;background:var(--sage);color:#fff;border:none;border-radius:4px;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:'Jost',sans-serif;transition:background 0.2s; }
+    .save-addr-btn:hover { background:#4d5e42; }
+    #addr-saved-msg { display:none;color:#3B6D11;font-size:13px;margin-top:8px;text-align:center; }
+    .signout-btn { width:calc(100% - 40px);display:block;margin:16px 20px;padding:11px;border:1.5px solid #f09595;color:#A32D2D;background:none;border-radius:4px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;font-family:'Jost',sans-serif;transition:all 0.2s; }
+    .signout-btn:hover { background:#FCEBEB; }
+
+    /* ══ NUMEROLOGY AI BOT ══ */
+    #numerology-bot {
+      position: fixed; bottom: 28px; right: 28px; z-index: 3500;
+    }
+    .bot-bubble {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--terra) 0%, #8a3a1e 100%);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 30px rgba(181,96,58,0.45), 0 2px 8px rgba(0,0,0,0.2);
+      transition: transform 0.3s, box-shadow 0.3s;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+    .bot-bubble:hover { transform: scale(1.1); box-shadow: 0 12px 40px rgba(181,96,58,0.55); }
+    .bot-bubble svg { width: 26px; height: 26px; }
+    .bot-pulse {
+      position: absolute; inset: -4px; border-radius: 50%;
+      background: var(--terra); opacity: 0.3;
+      animation: botPulse 2.5s ease infinite;
+    }
+    @keyframes botPulse { 0%,100% { transform: scale(1); opacity: 0.3; } 50% { transform: scale(1.2); opacity: 0; } }
+    .bot-tooltip {
+      position: absolute; bottom: calc(100% + 12px); right: 0;
+      background: var(--charcoal); color: var(--ivory);
+      font-family: 'Cormorant Garamond', serif; font-size: 14px; font-style: italic;
+      padding: 8px 14px; border-radius: 8px; white-space: nowrap;
+      opacity: 0; transform: translateY(6px); transition: all 0.25s;
+      pointer-events: none;
+    }
+    .bot-tooltip::after { content: ''; position: absolute; top: 100%; right: 20px; border: 6px solid transparent; border-top-color: var(--charcoal); }
+    #numerology-bot:hover .bot-tooltip { opacity: 1; transform: translateY(0); }
+
+    /* Numerology Chat Panel */
+    #num-panel {
+      position: fixed; bottom: 28px; right: 28px; z-index: 3500;
+      width: 380px; max-width: calc(100vw - 40px);
+      background: var(--white); border-radius: 20px;
+      box-shadow: 0 24px 64px rgba(44,43,40,0.2), 0 4px 16px rgba(44,43,40,0.08);
+      border: 1px solid rgba(181,96,58,0.15);
+      display: none; flex-direction: column; overflow: hidden;
+      max-height: 580px;
+      animation: panelIn 0.4s cubic-bezier(0.16,1,0.3,1);
+    }
+    @keyframes panelIn { from { opacity:0; transform: scale(0.9) translateY(20px) translateX(20px); transform-origin: bottom right; } to { opacity:1; transform: scale(1) translateY(0) translateX(0); } }
+    #num-panel.open { display: flex; }
+    .num-panel-head {
+      background: linear-gradient(135deg, var(--charcoal) 0%, #1a1917 100%);
+      padding: 18px 20px; display: flex; align-items: center; gap: 12px;
+      flex-shrink: 0;
+    }
+    .num-head-avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--terra), var(--gold));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .num-head-text h4 { color: var(--cream); font-family: 'Cormorant Garamond', serif; font-size: 18px; margin-bottom: 2px; }
+    .num-head-text p { color: #7a7569; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+    .num-panel-close { margin-left: auto; background: none; border: none; color: #6a6960; cursor: pointer; font-size: 20px; line-height: 1; transition: color 0.2s; }
+    .num-panel-close:hover { color: var(--terra-lt); }
+    .num-msgs {
+      flex: 1; overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .num-msg { max-width: 85%; }
+    .num-msg.bot { align-self: flex-start; }
+    .num-msg.user { align-self: flex-end; }
+    .num-msg-bubble {
+      padding: 12px 16px; border-radius: 14px; font-size: 14px; line-height: 1.6;
+    }
+    .num-msg.bot .num-msg-bubble { background: var(--ivory); color: var(--charcoal); border-radius: 4px 14px 14px 14px; }
+    .num-msg.user .num-msg-bubble { background: var(--terra); color: #fff; border-radius: 14px 14px 4px 14px; }
+    .num-msg-bubble strong { display: block; font-family: 'Cormorant Garamond', serif; font-size: 16px; margin-bottom: 4px; }
+    .num-typing { display: flex; gap: 4px; padding: 12px 16px; background: var(--ivory); border-radius: 4px 14px 14px 14px; width: fit-content; }
+    .num-typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: typingDot 1.2s ease infinite; }
+    .num-typing span:nth-child(2) { animation-delay: 0.2s; }
+    .num-typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingDot { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
+    .num-panel-input {
+      padding: 14px 16px; border-top: 1px solid var(--ivory);
+      display: flex; gap: 10px; flex-shrink: 0;
+    }
+    .num-panel-input input {
+      flex: 1; padding: 10px 14px; border: 1.5px solid var(--ivory);
+      border-radius: 8px; font-family: 'Jost', sans-serif; font-size: 14px;
+      background: var(--cream); color: var(--charcoal); outline: none;
+      transition: border-color 0.2s;
+    }
+    .num-panel-input input:focus { border-color: var(--terra); }
+    .num-send-btn {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--terra); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, transform 0.2s; flex-shrink: 0;
+    }
+    .num-send-btn:hover { background: #9a4f2e; transform: scale(1.08); }
+
+    /* ══ RESPONSIVE ══ */
+    /* ══ TABLET ══ */
+    @media (max-width: 900px) {
+      #hero { grid-template-columns: 1fr; }
+      .hero-img { height: 300px; order: -1; }
+      .hero-text { padding: 32px 20px 40px; }
+      .hero-text h1 { font-size: 42px; }
+      .hero-decor-num { display: none; }
+      .about-grid { grid-template-columns: 1fr; gap: 40px; }
+      .about-img-wrap { height: 300px; }
+      .about-img-wrap::after { display: none; }
+      .chakra-inner { grid-template-columns: 1fr; gap: 40px; }
+      .blog-grid { grid-template-columns: 1fr; }
+      .blog-card:first-child .blog-img { height: 200px; }
+      .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+      .nav-links { display: none; }
+      .hamburger { display: flex; }
+      .sessions-grid { grid-template-columns: 1fr; }
+      .meditation-list { grid-template-columns: 1fr; }
+    }
+
+    /* ══ MOBILE ══ */
+    @media (max-width: 560px) {
+      /* Base */
+      body { font-size: 15px; }
+      .container { padding: 0 16px; }
+      .section-head { margin-bottom: 40px; }
+      .section-head h2 { font-size: 32px; }
+      .btn { padding: 12px 22px; font-size: 11px; }
+
+      /* Nav */
+      .nav-inner { height: 60px; padding: 0 16px; }
+      .nav-logo { font-size: 19px; }
+      .nav-user-area { gap: 6px; }
+      .cart-nav-btn { padding: 6px; }
+      #nav-signin-btn { padding: 8px 14px; font-size: 11px; }
+      #nav-user-btn { padding: 6px 10px; font-size: 11px; }
+
+      /* Hero */
+      #hero { padding-top: 60px; }
+      .hero-img { height: 240px; }
+      .hero-text { padding: 28px 16px 36px; }
+      .hero-text h1 { font-size: 36px; margin-bottom: 16px; }
+      .hero-text > p { font-size: 14px; margin-bottom: 28px; }
+      .hero-actions { flex-direction: column; gap: 10px; }
+      .hero-actions .btn { text-align: center; width: 100%; }
+      .hero-badge { font-size: 13px; padding: 12px 20px; }
+
+      /* Features strip */
+      .features-track { flex-direction: column; align-items: stretch; }
+      .feature-item { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 12px 16px; justify-content: center; font-size: 10px; }
+      .feature-item:last-child { border-bottom: none; }
+
+      /* Shop */
+      #shop { padding: 70px 0; }
+      #shop::before { display: none; }
+      .shop-tabs { overflow-x: auto; justify-content: flex-start; padding-bottom: 2px; gap: 0; -webkit-overflow-scrolling: touch; }
+      .shop-tabs::-webkit-scrollbar { display: none; }
+      .shop-tab { padding: 10px 16px; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+      .products-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+      .product-img { height: 200px; }
+      .product-info { padding: 14px 14px 16px; }
+      .product-name { font-size: 17px; }
+      .product-desc { font-size: 12px; margin-bottom: 12px; }
+      .product-price { font-size: 20px; }
+      .product-foot { flex-direction: column; gap: 10px; align-items: flex-start; }
+      .product-btns { width: 100%; }
+      .product-btns .add-btn, .product-btns .buy-btn { flex: 1; text-align: center; padding: 8px 10px; font-size: 10px; }
+      #see-all-wrap { margin-top: 32px; }
+      #see-all-btn { padding: 14px 28px; font-size: 11px; width: 100%; justify-content: center; }
+
+      /* Crystal Quiz */
+      #crystal-quiz { padding: 70px 0; }
+      .quiz-wrap h2 { font-size: 32px; }
+      .quiz-wrap > p { font-size: 14px; }
+      .quiz-question { font-size: 20px; }
+      .quiz-options { grid-template-columns: 1fr; gap: 10px; }
+      .quiz-option { padding: 14px 16px; }
+      .quiz-option strong { font-size: 14px; }
+      .quiz-next { width: 100%; padding: 14px; }
+      .quiz-result-inner { padding: 28px 20px; }
+      .quiz-result h3 { font-size: 26px; }
+
+      /* Testimonials */
+      #testimonials { padding: 60px 0; }
+      #testimonials h2 { font-size: 28px; }
+      .tcard { min-width: 260px; max-width: 260px; padding: 18px 18px; }
+      .tcard-text { font-size: 15px; }
+
+      /* Chakra guide */
+      #chakra-guide { padding: 70px 0; }
+      .chakra-inner { gap: 32px; }
+      .chakra-intro h2 { font-size: 30px; }
+      .chakra-detail { padding: 24px 20px; min-height: auto; }
+      .chakra-detail h3 { font-size: 24px; }
+      .chakra-crystals { gap: 6px; }
+      .chakra-crystal-tag { font-size: 11px; padding: 4px 10px; }
+
+      /* Ritual guide */
+      #ritual-guide { padding: 70px 0; }
+      #ritual-guide::before { display: none; }
+      .ritual-steps { grid-template-columns: 1fr; gap: 20px; }
+      .ritual-step { padding: 32px 24px; }
+      .ritual-step h3 { font-size: 22px; }
+
+      /* About */
+      #about { padding: 70px 0; }
+      .about-img-wrap { height: 240px; }
+      .about-text h2 { font-size: 28px; }
+      .about-stats { grid-template-columns: 1fr 1fr; gap: 16px; }
+      .stat-num { font-size: 32px; }
+
+      /* Meditations */
+      #meditations { padding: 70px 0; }
+      .meditation-card { flex-direction: column; gap: 14px; padding: 20px; }
+      .play-btn { width: 44px; height: 44px; flex-shrink: 0; }
+      .med-title { font-size: 18px; }
+
+      /* Sessions */
+      #sessions { padding: 70px 0; }
+      #sessions::before { display: none; }
+      .sessions-grid { grid-template-columns: 1fr; gap: 20px; }
+      .session-head h3 { font-size: 20px; }
+      .session-price { font-size: 24px; }
+      .session-foot { flex-direction: column; gap: 12px; align-items: flex-start; }
+      .session-foot .btn { width: 100%; text-align: center; }
+
+      /* Blog */
+      #blog { padding: 70px 0; }
+      .blog-grid { grid-template-columns: 1fr; gap: 16px; }
+      .blog-img { height: 180px; }
+      .blog-title { font-size: 20px; }
+
+      /* Subscribe */
+      #subscribe { padding: 60px 0; }
+      #subscribe h2 { font-size: 28px; }
+      .subscribe-form { flex-direction: column; gap: 10px; }
+      .subscribe-form input, .sub-form-btn { width: 100%; }
+
+      /* Footer */
+      .footer-grid { grid-template-columns: 1fr; gap: 28px; }
+      .footer-bottom { flex-direction: column; gap: 16px; text-align: center; }
+
+      /* Popup */
+      .popup-row { flex-direction: column; }
+      #popup { border-radius: 14px; }
+      #popup-top { padding: 28px 20px 20px; }
+      #popup-top h2 { font-size: 26px; }
+      #popup-body { padding: 20px 20px 24px; }
+
+      /* Product Modal */
+      #modal-box { grid-template-columns: 1fr; border-radius: 14px; }
+      #modal-img-wrap { min-height: 240px; border-radius: 14px 14px 0 0; }
+      #modal-content { padding: 24px 20px; }
+      #modal-name { font-size: 26px; }
+      #modal-price { font-size: 24px; }
+      #modal-attrs { grid-template-columns: 1fr 1fr; }
+
+      /* Auth Modal */
+      #auth-box { border-radius: 14px; }
+      #auth-top { padding: 24px 20px 18px; }
+      #auth-body { padding: 20px 20px 24px; }
+
+      /* Booking Modal */
+      #booking-overlay > div { border-radius: 14px; }
+      #booking-overlay > div > div:first-child { border-radius: 14px 14px 0 0; padding: 24px 20px 18px; }
+      #booking-overlay > div > div:last-child { padding: 20px; }
+      #booking-overlay input, #booking-overlay select, #booking-overlay textarea { font-size: 16px; }
+      #booking-overlay > div > div:last-child > div#booking-form > div:first-child { grid-template-columns: 1fr; }
+
+      /* Numerology panel */
+      #num-panel { width: calc(100vw - 20px); right: 10px; bottom: 10px; max-height: 75vh; border-radius: 16px; }
+      #numerology-bot { bottom: 16px; right: 16px; }
+      .bot-bubble { width: 52px; height: 52px; }
+      .num-msgs { padding: 12px; gap: 10px; }
+      .num-msg-bubble { font-size: 13px; padding: 10px 13px; }
+      .num-panel-input { padding: 10px 12px; }
+      .num-panel-input input { font-size: 15px; }
+
+      /* Cart drawer */
+      #cart-drawer { width: 100vw; }
+      .cart-item-name { font-size: 15px; }
+
+      /* Profile modal */
+      #profile-modal { padding: 68px 0 0; }
+      #profile-box { width: 100%; border-radius: 20px 20px 0 0; max-height: 85vh; }
+
+      /* Misc fixes */
+      .pull-quote { font-size: 16px; }
+      .section-label { font-size: 10px; letter-spacing: 2px; }
+      .about-text > p { font-size: 14px; }
+    }
+
+    /* ══ VERY SMALL PHONES (iPhone SE etc) ══ */
+    @media (max-width: 380px) {
+      .products-grid { grid-template-columns: 1fr; }
+      .hero-text h1 { font-size: 30px; }
+      .product-img { height: 220px; }
+      .quiz-wrap h2 { font-size: 26px; }
+    }
+
+    /* ══ TOUCH & MOBILE FIXES ══ */
+    * { -webkit-tap-highlight-color: transparent; }
+    input, select, textarea { font-size: 16px !important; } /* prevent iOS zoom on focus */
+    button, .btn, .add-btn, .buy-btn, .quiz-option, .shop-tab { touch-action: manipulation; }
+    .shop-tabs { -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    #cart-drawer, #profile-box, .num-msgs { -webkit-overflow-scrolling: touch; }
+    img { -webkit-user-drag: none; }
+
+    /* ══ NAV USER AREA ══ */
+    #nav-signin-btn { display: flex; }
+    #nav-user-btn {
+      display: none; align-items: center; gap: 8px;
+      background: none; border: 1.5px solid var(--ivory);
+      padding: 8px 16px; border-radius: 4px; cursor: pointer;
+      font-family: 'Jost', sans-serif; font-size: 12px; color: var(--charcoal);
+      transition: border-color 0.2s;
+    }
+    #nav-user-btn:hover { border-color: var(--terra); }
+  </style>
+</head>
+<body>
+
+<!-- ══ PRODUCT MODAL ══ -->
+<div id="product-modal">
+  <div id="modal-box">
+    <button id="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-img-wrap">
+      <img id="modal-img" src="" alt="" style="display:none;">
+      <div id="modal-img-placeholder">◈</div>
+    </div>
+    <div id="modal-content">
+      <p id="modal-type"></p>
+      <h2 id="modal-name"></h2>
+      <p id="modal-price"></p>
+      <div id="modal-attrs"></div>
+      <p id="modal-desc"></p>
+      <p id="modal-benefits-title">Benefits</p>
+      <ul id="modal-benefits"></ul>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button id="modal-add-cart" class="add-btn" onclick="addToCartFromModal()">Add to Cart</button>
+        <a id="modal-buy" href="#" target="_blank" style="flex:1;">Buy Now</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BOOKING MODAL ══ -->
+<div id="booking-overlay" style="position:fixed;inset:0;z-index:4500;background:rgba(44,43,40,0.75);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--white);border-radius:20px;width:500px;max-width:100%;max-height:90vh;overflow-y:auto;animation:modalIn 0.4s cubic-bezier(0.16,1,0.3,1);">
+    <div style="background:linear-gradient(135deg,var(--charcoal),#1a1917);padding:32px 28px 24px;border-radius:20px 20px 0 0;position:relative;">
+      <button onclick="closeBookingModal()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">✕</button>
+      <p style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--terra-lt);margin-bottom:8px;">Heal Yourr Self</p>
+      <h2 style="color:var(--cream);font-family:'Cormorant Garamond',serif;font-size:28px;font-style:italic;margin-bottom:6px;">Book Your Healing Session</h2>
+      <p style="color:#7a7569;font-size:13px;">Fill in your details and we will contact you within 24 hours</p>
+    </div>
+    <div style="padding:28px;">
+      <div id="booking-form">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <div>
+            <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Full Name *</label>
+            <input id="bk-name" type="text" placeholder="Your name" style="width:100%;padding:11px 14px;border:1.5px solid var(--ivory);border-radius:6px;font-family:'Jost',sans-serif;font-size:14px;background:var(--cream);color:var(--charcoal);outline:none;">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Phone / WhatsApp *</label>
+            <input id="bk-phone" type="tel" placeholder="+91 XXXXX XXXXX" style="width:100%;padding:11px 14px;border:1.5px solid var(--ivory);border-radius:6px;font-family:'Jost',sans-serif;font-size:14px;background:var(--cream);color:var(--charcoal);outline:none;">
+          </div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Email Address *</label>
+          <input id="bk-email" type="email" placeholder="your@email.com" style="width:100%;padding:11px 14px;border:1.5px solid var(--ivory);border-radius:6px;font-family:'Jost',sans-serif;font-size:14px;background:var(--cream);color:var(--charcoal);outline:none;">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Session Type</label>
+          <select id="bk-session" style="width:100%;padding:11px 14px;border:1.5px solid var(--ivory);border-radius:6px;font-family:'Jost',sans-serif;font-size:14px;background:var(--cream);color:var(--charcoal);outline:none;">
+            <option>Crystal Healing Session — ₹1,499</option>
+            <option>Energy Healing + Meditation — ₹2,199</option>
+            <option>Monthly Healing Journey — ₹4,999</option>
+          </select>
+        </div>
+        <div style="margin-bottom:20px;">
+          <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Cause / Reason for Healing *</label>
+          <textarea id="bk-reason" rows="3" placeholder="Briefly share what you are seeking healing for — anxiety, relationships, energy, grief, spiritual growth..." style="width:100%;padding:11px 14px;border:1.5px solid var(--ivory);border-radius:6px;font-family:'Jost',sans-serif;font-size:14px;background:var(--cream);color:var(--charcoal);outline:none;resize:none;line-height:1.6;"></textarea>
+        </div>
+        <p id="bk-error" style="color:#E24B4A;font-size:13px;margin-bottom:10px;min-height:18px;"></p>
+        <button onclick="submitBooking()" style="width:100%;padding:15px;background:var(--terra);color:#fff;border:none;border-radius:6px;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:'Jost',sans-serif;font-weight:500;transition:background 0.2s;">Send Booking Request</button>
+      </div>
+      <div id="booking-success" style="display:none;text-align:center;padding:20px 0;">
+        <div style="width:60px;height:60px;border-radius:50%;background:#e8f0e4;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3B6D11" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:26px;margin-bottom:10px;font-style:italic;">We'll be in touch soon ✦</h3>
+        <p style="color:var(--muted);font-size:14px;line-height:1.8;">Thank you for reaching out. We have received your booking request and will contact you within 24 hours on WhatsApp or Email.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ AUTH MODAL ══ -->
+<div id="auth-overlay">
+  <div id="auth-box">
+    <div id="auth-top">
+      <button id="auth-modal-close" onclick="closeAuthModal()">✕</button>
+      <h2>Welcome back</h2>
+      <p>Sign in to save your cart &amp; address</p>
+    </div>
+    <div id="auth-body">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-signin" onclick="switchAuthTab('signin')">Sign In</button>
+        <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+      </div>
+      <div id="auth-name-wrap" class="auth-input-group" style="display:none;">
+        <label>Your Name</label>
+        <input type="text" id="auth-name" placeholder="Full name">
+      </div>
+      <div class="auth-input-group">
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="your@email.com">
+      </div>
+      <div class="auth-input-group">
+        <label>Password</label>
+        <input type="password" id="auth-pass" placeholder="Min 6 characters">
+      </div>
+      <p id="auth-error"></p>
+      <button class="auth-submit-btn" id="auth-submit-btn" onclick="handleAuthSubmit()">Sign In</button>
+      <div class="auth-divider">or</div>
+      <button class="google-btn" onclick="signInWithGoogle()">
+        <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PROFILE MODAL ══ -->
+<div id="profile-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div id="profile-box">
+    <div class="profile-head">
+      <div class="profile-avatar" id="profile-avatar">👤</div>
+      <div>
+        <p class="profile-name" id="profile-display-name">My Account</p>
+        <p class="profile-email" id="profile-display-email"></p>
+      </div>
+    </div>
+    <div class="profile-section">
+      <h4>Saved Address</h4>
+      <div class="addr-grid">
+        <div class="full"><input type="text" id="addr-name" placeholder="Full name"></div>
+        <input type="tel" id="addr-phone" placeholder="Phone number">
+        <input type="text" id="addr-pincode" placeholder="Pincode">
+        <div class="full"><input type="text" id="addr-line1" placeholder="House / Street / Area"></div>
+        <input type="text" id="addr-city" placeholder="City">
+        <input type="text" id="addr-state" placeholder="State">
+      </div>
+      <button class="save-addr-btn" onclick="saveAddress()">Save Address</button>
+      <p id="addr-saved-msg">Address saved ✅</p>
+    </div>
+    <div class="profile-section">
+      <h4>Order History</h4>
+      <div id="order-history-container" style="max-height:300px;overflow-y:auto;">
+        <p style="color:var(--muted);text-align:center;padding:20px;">Loading orders...</p>
+      </div>
+    </div>
+    <button class="signout-btn" onclick="signOutUser()">Sign Out</button>
+  </div>
+</div>
+
+<!-- ══ CART DRAWER ══ -->
+<div id="cart-overlay" onclick="if(event.target===this)closeCart()">
+  <div id="cart-drawer">
+    <div id="cart-head">
+      <h3>Your Cart</h3>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="cart-count-head" style="font-size:13px;color:var(--muted);"></span>
+        <button id="cart-close-btn" onclick="closeCart()">✕</button>
+      </div>
+    </div>
+    <div id="cart-items">
+      <div id="cart-empty">
+        <div class="ei">🛒</div>
+        <p>Your cart is empty</p>
+        <button class="btn" onclick="closeCart()">Continue Shopping</button>
+      </div>
+    </div>
+    <div id="cart-footer" style="display:none;">
+      <div id="cart-summary">
+        <div class="cart-summary-row"><span>Subtotal</span><span id="cart-subtotal">₹0</span></div>
+        <div class="cart-summary-row"><span>Shipping</span><span>Free</span></div>
+        <div class="cart-summary-row total"><span>Total</span><span id="cart-total">₹0</span></div>
+      </div>
+      <button id="cart-checkout" onclick="handleCheckout()">Proceed to Checkout</button>
+      <button id="cart-continue" onclick="closeCart()">Continue Shopping</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SUBSCRIBE POPUP ══ -->
+<div id="popup-overlay">
+  <div id="popup">
+    <div id="popup-top">
+      <button id="popup-close" aria-label="Close">✕</button>
+      <h2>Welcome, dear soul</h2>
+      <p>Join our community — free meditations, crystal guides &amp; healing offers</p>
+    </div>
+    <div id="popup-body">
+      <p>No spam, ever. Unsubscribe anytime.</p>
+      <div class="popup-row">
+        <input type="email" id="popup-email" placeholder="Your email address" />
+        <button class="btn btn-filled" onclick="handlePopupSubscribe()">Subscribe</button>
+      </div>
+      <button id="popup-skip" onclick="closePopup()">No thanks, I'll explore first</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ NUMEROLOGY AI BOT ══ -->
+<div id="numerology-bot" onclick="openNumerologyBot()">
+  <div class="bot-pulse"></div>
+  <div class="bot-bubble">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l3 3"/><path d="M22 6l-2.5 2.5"/><path d="M19 3l-2.5 2.5"/><path d="M22 9h-3"/></svg>
+  </div>
+  <div class="bot-tooltip">✦ Discover your crystal by birth date</div>
+</div>
+
+<!-- ══ NUMEROLOGY PANEL ══ -->
+<div id="num-panel">
+  <div class="num-panel-head">
+    <div class="num-head-avatar">✦</div>
+    <div class="num-head-text">
+      <h4>Numerology Guide</h4>
+      <p>Crystal reading by birth date</p>
+    </div>
+    <button class="num-panel-close" onclick="closeNumerologyBot()">✕</button>
+  </div>
+  <div class="num-msgs" id="num-msgs"></div>
+  <div class="num-panel-input">
+    <input type="text" id="num-input" placeholder="Type your message…" onkeydown="if(event.key==='Enter')sendNumMsg()">
+    <button class="num-send-btn" onclick="sendNumMsg()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ══ NAVIGATION ══ -->
+<nav id="main-nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">Heal Yourr <span>Self</span></a>
+    <ul class="nav-links">
+      <li><a href="#shop">Crystals</a></li>
+      <li><a href="#meditations">Meditations</a></li>
+      <li><a href="#sessions">Healing</a></li>
+      <li><a href="#chakra-guide">Chakras</a></li>
+      <li><a href="#about">Our Story</a></li>
+      <li><a href="#blog">Journal</a></li>
+    </ul>
+    <div class="nav-user-area">
+      <button class="cart-nav-btn" onclick="openCart()" title="Cart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+        <span id="cart-badge"></span>
+      </button>
+      <button id="nav-signin-btn" class="btn nav-cta" onclick="openAuthModal()">Sign In</button>
+      <button id="nav-user-btn" onclick="openProfileModal()">
+        <span style="font-size:16px;">👤</span>
+        <span id="nav-user-name">Account</span>
+      </button>
+    </div>
+    <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- ══ HERO ══ -->
+<section id="hero">
+  <div class="hero-text">
+    <p class="section-label">Crystals · Meditations · Healing Sessions</p>
+    <h1>Heal, rise &amp; <em>transform</em> your life</h1>
+    <p>Ethically sourced crystals, powerful guided meditations and one-on-one healing sessions — everything you need to come back to yourself.</p>
+    <div class="hero-actions">
+      <a href="#sessions" class="btn btn-filled">Book a Healing Session</a>
+      <a href="#shop" class="btn">Shop Crystals</a>
+    </div>
+  </div>
+  <div class="hero-img">
+    <div class="hero-img-placeholder">
+      <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M60 10 C60 10 20 40 20 70 C20 92 38 110 60 110 C82 110 100 92 100 70 C100 40 60 10 60 10Z" stroke="rgba(255,255,255,0.35)" stroke-width="2" fill="none"/>
+        <line x1="60" y1="10" x2="60" y2="110" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+        <line x1="40" y1="50" x2="60" y2="68" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+        <line x1="80" y1="50" x2="60" y2="68" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+        <line x1="35" y1="70" x2="60" y2="84" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+        <line x1="85" y1="70" x2="60" y2="84" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="hero-decor-num">01</div>
+    <div class="hero-badge">Heal Yourr Self — With love &amp; intention</div>
+  </div>
+</section>
+
+<!-- ══ FEATURES STRIP ══ -->
+<div id="features">
+  <div class="features-track">
+    <div class="feature-item"><span class="feature-dot"></span>Ethically Sourced Crystals</div>
+    <div class="feature-item"><span class="feature-dot"></span>Guided Meditations MP3</div>
+    <div class="feature-item"><span class="feature-dot"></span>1-on-1 Healing Sessions</div>
+    <div class="feature-item"><span class="feature-dot"></span>Energy Cleansed &amp; Blessed</div>
+    <div class="feature-item"><span class="feature-dot"></span>Worldwide Delivery</div>
+  </div>
+</div>
+
+<!-- ══ CRYSTAL QUIZ ══ -->
+<section id="crystal-quiz">
+  <div class="container">
+    <div class="quiz-wrap">
+      <p class="section-label reveal">Find Your Crystal</p>
+      <h2 class="reveal">Which crystal is calling to <em>you?</em></h2>
+      <p class="reveal">Answer 3 questions and we'll guide you to the crystals that match your energy right now.</p>
+
+      <div class="quiz-progress" id="quiz-progress">
+        <div class="quiz-dot active" id="qdot-0"></div>
+        <div class="quiz-dot" id="qdot-1"></div>
+        <div class="quiz-dot" id="qdot-2"></div>
+        <div class="quiz-dot" id="qdot-3"></div>
+      </div>
+
+      <div class="quiz-step active" id="qstep-0">
+        <p class="quiz-question">What are you seeking most right now in your life?</p>
+        <div class="quiz-options">
+          <div class="quiz-option" onclick="selectQuizOption(0, 'love')"><strong>Love &amp; Connection</strong><span>Open my heart, attract love, heal relationships</span></div>
+          <div class="quiz-option" onclick="selectQuizOption(0, 'abundance')"><strong>Abundance &amp; Success</strong><span>Attract wealth, manifest goals, build confidence</span></div>
+          <div class="quiz-option" onclick="selectQuizOption(0, 'protection')"><strong>Protection &amp; Grounding</strong><span>Feel safe, clear negativity, stay rooted</span></div>
+          <div class="quiz-option" onclick="selectQuizOption(0, 'spiritual')"><strong>Spiritual Growth</strong><span>Deepen intuition, expand consciousness, find purpose</span></div>
+        </div>
+        <button class="quiz-next" onclick="nextQuizStep()" id="qnext-0" style="opacity:0.4;cursor:not-allowed;" disabled>Continue →</button>
+      </div>
+
+      <div class="quiz-step" id="qstep-1">
+        <p class="quiz-question">What best describes your current energy?</p>
+        <div class="quiz-options">
+          <div class="quiz-option" onclick="selectQuizOption(1, 'scattered')"><strong>Scattered &amp; Anxious</strong><span>Mind is busy, hard to focus or settle</span></div>
+          <div class="quiz-option" onclick="selectQuizOption(1, 'stagnant')"><strong>Stuck &amp; Stagnant</strong><span>Feeling blocked, lack of motivation or direction</span></div>
+          <div class="quiz-option" onclick="selectQuizOption(1, 'healing')"><strong>Healing &amp; Tender</strong><span>Processing emotions, need nurturing and care</span></div>
+          <div class="quiz-option" onclick="selectQuizOption(1, 'ready')"><strong>Ready to Rise</strong><span>Feeling motivated and want to amplify the energy</span></div>
+        </div>
+        <button class="quiz-next" onclick="nextQuizStep()" id="qnext-1" style="opacity:0.4;cursor:not-allowed;" disabled>Continue →</button>
+      </div>
+
+      <div class="quiz-step" id="qstep-2">
+        <p class="quiz-question">Which colour resonates with you most today?</p>
+        <div class="quiz-options">
+          <div class="quiz-option" onclick="selectQuizOption(2, 'pink-rose')"><strong>Pink &amp; Soft Rose</strong><span>Gentle, romantic, warm</span></div>
+          <div class="quiz-option" onclick="selectQuizOption(2, 'purple-blue')"><strong>Purple &amp; Deep Blue</strong><span>Mystical, calming, wise</span></div>
+          <div class="quiz-option" onclick="selectQuizOption(2, 'gold-yellow')"><strong>Gold &amp; Amber</strong><span>Bright, energising, magnetic</span></div>
+          <div class="quiz-option" onclick="selectQuizOption(2, 'green-earth')"><strong>Green &amp; Earthy</strong><span>Grounding, healing, natural</span></div>
+        </div>
+        <button class="quiz-next" onclick="getQuizResult()" id="qnext-2" style="opacity:0.4;cursor:not-allowed;" disabled>Reveal My Crystal →</button>
+      </div>
+
+      <div class="quiz-step" id="qstep-loading">
+        <div id="quiz-loading">
+          <div style="font-size:40px;margin-bottom:16px;animation:kenBurns 3s ease infinite alternate;">◈</div>
+          Reading your energy…
+        </div>
+      </div>
+
+      <div class="quiz-step" id="qstep-result">
+        <div class="quiz-result">
+          <div class="quiz-result-inner" id="quiz-result-inner"></div>
+          <button class="quiz-next" style="margin-top:24px;" onclick="resetQuiz()">Take the Quiz Again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SHOP ══ -->
+<section id="shop" data-num="02">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="section-label">Sacred Collection</p>
+      <h2>Crystals &amp; Gifts</h2>
+      <p>Every crystal is hand-picked, cleansed under the moon and charged with intention before it reaches you.</p>
+      <p class="pull-quote">"Each stone carries a frequency — you are drawn to exactly what you need"</p>
+    </div>
+
+    <div class="shop-tabs reveal">
+      <button class="shop-tab active" onclick="switchTab('all', this)">All</button>
+      <button class="shop-tab" onclick="switchTab('love', this)">Love &amp; Heart</button>
+      <button class="shop-tab" onclick="switchTab('protection', this)">Protection</button>
+      <button class="shop-tab" onclick="switchTab('abundance', this)">Abundance</button>
+      <button class="shop-tab" onclick="switchTab('spiritual', this)">Spiritual</button>
+    </div>
+
+    <div id="tab-all" class="tab-section active">
+      <div class="products-grid">
+
+        <!-- ══ TOP 4 FEATURED — always visible ══ -->
+        <div class="product-card reveal" data-cat="love" data-featured="true" onclick="openProduct('rose-quartz')" style="--card-glow:rgba(212,83,126,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#f5e0e8,#eeccd8);"><img src="./rose-quartz.png" alt="rose-quartz" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#c45a7e;background:linear-gradient(145deg,#f5e0e8,#eeccd8);"><span class="ph-symbol">♡</span><span class="ph-name">Rose Quartz</span></div><span class="product-badge">Bestseller</span></div>
+          <div class="product-info"><p class="product-type">Bracelet · Heart Chakra</p><h3 class="product-name">Rose Quartz Bracelet</h3><p class="product-desc">Boosts self-love, heals relationship issues, brings peace, calmness and mutual understanding.</p><div class="product-foot"><span class="product-price">₹800</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'rose-quartz')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('rose-quartz')">Buy Now</button></div></div></div>
+        </div>
+
+        <div class="product-card reveal" data-cat="spiritual" data-featured="true" onclick="openProduct('amethyst')" style="--card-glow:rgba(127,119,221,0.25);">
+          <div class="product-img" style="background:linear-gradient(145deg,#e8e4f8,#d4cdf0);"><img src="./amethyst.png" alt="amethyst" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#6b5fc7;background:linear-gradient(145deg,#e8e4f8,#d4cdf0);"><span class="ph-symbol">◈</span><span class="ph-name">Amethyst</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Crown Chakra</p><h3 class="product-name">Amethyst Bracelet</h3><p class="product-desc">Improves focus, reduces insomnia, promotes hormonal balance and spiritual wisdom.</p><div class="product-foot"><span class="product-price">₹900</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'amethyst')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('amethyst')">Buy Now</button></div></div></div>
+        </div>
+
+        <div class="product-card reveal" data-cat="abundance" data-featured="true" onclick="openProduct('citrine')" style="--card-glow:rgba(196,154,60,0.25);">
+          <div class="product-img" style="background:linear-gradient(145deg,#fdf0cc,#f5e09a);"><img src="./citrine.png" alt="citrine" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#a07818;background:linear-gradient(145deg,#fdf0cc,#f5e09a);"><span class="ph-symbol">✦</span><span class="ph-name">Citrine</span></div><span class="product-badge">Popular</span></div>
+          <div class="product-info"><p class="product-type">Bracelet · Solar Plexus</p><h3 class="product-name">Citrine Bracelet</h3><p class="product-desc">Attracts wealth, prosperity and success. Known as the merchant's stone — brings financial abundance and joy.</p><div class="product-foot"><span class="product-price">₹2,000</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'citrine')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('citrine')">Buy Now</button></div></div></div>
+        </div>
+
+        <div class="product-card reveal" data-cat="protection" data-featured="true" onclick="openProduct('triple-protection')" style="--card-glow:rgba(68,68,65,0.3);">
+          <div class="product-img" style="background:linear-gradient(145deg,#e0dedd,#c8c6c4);"><img src="./triple-protection.png" alt="triple-protection" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#444441;background:linear-gradient(145deg,#e0dedd,#c8c6c4);"><span class="ph-symbol">◈</span><span class="ph-name">Triple Protection</span></div></div>
+          <div class="product-info"><p class="product-type">Combination Bracelet</p><h3 class="product-name">Triple Protection Bracelet</h3><p class="product-desc">Tiger Eye + Black Obsidian + Hematite — shields against negativity, promotes grounding and emotional healing.</p><div class="product-foot"><span class="product-price">₹1,100</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'triple-protection')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('triple-protection')">Buy Now</button></div></div></div>
+        </div>
+
+        <!-- ══ ALL REMAINING 15 — hidden until "See All" clicked ══ -->
+        <div id="extra-crystals" style="display:contents;">
+
+        <div class="product-card reveal extra-crystal" data-cat="abundance" onclick="openProduct('iron-pyrite')" style="--card-glow:rgba(180,160,48,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#f2eacc,#e8d890);"><img src="./iron-pyrite.png" alt="iron-pyrite" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#8a7010;background:linear-gradient(145deg,#f2eacc,#e8d890);"><span class="ph-symbol">⬡</span><span class="ph-name">Iron Pyrite</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Solar Plexus</p><h3 class="product-name">Iron Pyrite Bracelet</h3><p class="product-desc">Attracts wealth and abundance, offers protection, strengthens the solar plexus chakra and protects the aura.</p><div class="product-foot"><span class="product-price">₹1,100</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'iron-pyrite')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('iron-pyrite')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="abundance" onclick="openProduct('money-magnet')" style="--card-glow:rgba(196,154,60,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#f5edcc,#e8d898);"><img src="./money-magnet.png" alt="money-magnet" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#a07818;background:linear-gradient(145deg,#f5edcc,#e8d898);"><span class="ph-symbol">◇</span><span class="ph-name">Money Magnet</span></div><span class="product-badge">Best Value</span></div>
+          <div class="product-info"><p class="product-type">Combination Bracelet</p><h3 class="product-name">Money Magnet Bracelet</h3><p class="product-desc">Tiger Eye + Pyrite + Citrine + Aventurine — a powerful combination to attract abundance, confidence and luck.</p><div class="product-foot"><span class="product-price">₹1,100</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'money-magnet')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('money-magnet')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="protection" onclick="openProduct('malachite')" style="--card-glow:rgba(29,158,117,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#cceedd,#a0d8b8);"><img src="./malachite.png" alt="malachite" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#0e7a4a;background:linear-gradient(145deg,#cceedd,#a0d8b8);"><span class="ph-symbol">◉</span><span class="ph-name">Malachite</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Heart Chakra</p><h3 class="product-name">Malachite Bracelet</h3><p class="product-desc">Most important healing stone of the new millennium. Absorbs negative energies, protects against radiation and brings transformation.</p><div class="product-foot"><span class="product-price">₹2,300</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'malachite')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('malachite')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="spiritual" onclick="openProduct('labradorite')" style="--card-glow:rgba(55,138,221,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#cce0f8,#a0c4ee);"><img src="./labradorite-bracelet.png" alt="labradorite" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#185fa5;background:linear-gradient(145deg,#cce0f8,#a0c4ee);"><span class="ph-symbol">✦</span><span class="ph-name">Labradorite</span></div><span class="product-badge">Magical</span></div>
+          <div class="product-info"><p class="product-type">Bracelet · All Chakras</p><h3 class="product-name">Labradorite Bracelet</h3><p class="product-desc">Stone of magic for healers. Awakens inner spirit, intuition and psychic abilities. Brings personal magical powers to surface.</p><div class="product-foot"><span class="product-price">₹1,500</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'labradorite')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('labradorite')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="spiritual" onclick="openProduct('tanzanite')" style="--card-glow:rgba(83,74,183,0.25);">
+          <div class="product-img" style="background:linear-gradient(145deg,#dcd8f8,#b8b0ec);"><img src="./tenzanite.png" alt="tanzanite" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#3c3489;background:linear-gradient(145deg,#dcd8f8,#b8b0ec);"><span class="ph-symbol">✦</span><span class="ph-name">Tanzanite</span></div><span class="product-badge">Premium</span></div>
+          <div class="product-info"><p class="product-type">Bracelet · Third Eye &amp; Crown</p><h3 class="product-name">Tanzanite Bracelet</h3><p class="product-desc">One of the rarest stones on earth. Connects you to higher consciousness and facilitates communication with higher dimensions.</p><div class="product-foot"><span class="product-price">₹4,600</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'tanzanite')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('tanzanite')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="love" onclick="openProduct('garnet')" style="--card-glow:rgba(216,90,48,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#f5d0c0,#e8a888);"><img src="./garnet-bracelet.png" alt="garnet" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#9a2e10;background:linear-gradient(145deg,#f5d0c0,#e8a888);"><span class="ph-symbol">◉</span><span class="ph-name">Garnet</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Sacral Chakra</p><h3 class="product-name">Garnet Bracelet</h3><p class="product-desc">A powerful energising stone especially for women. Cleanses and re-energises the chakras while inspiring love and devotion.</p><div class="product-foot"><span class="product-price">₹1,100</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'garnet')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('garnet')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="protection" onclick="openProduct('lapis-lazuli')" style="--card-glow:rgba(24,95,165,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#c8d8f0,#90aad8);"><img src="./lapis-lazuli.png" alt="lapis-lazuli" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#0c447c;background:linear-gradient(145deg,#c8d8f0,#90aad8);"><span class="ph-symbol">⬡</span><span class="ph-name">Lapis Lazuli</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Third Eye</p><h3 class="product-name">Lapis Lazuli Bracelet</h3><p class="product-desc">Stone of wisdom, truth and royal energy. Awakens the third eye, activates inner power and brings positive magic.</p><div class="product-foot"><span class="product-price">₹1,000</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'lapis-lazuli')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('lapis-lazuli')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="spiritual" onclick="openProduct('carnelian')" style="--card-glow:rgba(216,90,48,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#fad8c0,#f0a878);"><img src="./carnelian-bracelet.png" alt="carnelian" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#8a3a10;background:linear-gradient(145deg,#fad8c0,#f0a878);"><span class="ph-symbol">◉</span><span class="ph-name">Carnelian</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Sacral Chakra</p><h3 class="product-name">Carnelian Bracelet</h3><p class="product-desc">Makes you fearless and action-oriented. Restores vitality, motivation and a natural cleanser that also cleanses other crystals.</p><div class="product-foot"><span class="product-price">₹900</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'carnelian')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('carnelian')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="spiritual" onclick="openProduct('azurite')" style="--card-glow:rgba(24,95,165,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#c8dcf5,#8ab0e0);"><img src="./azurite.png" alt="azurite" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#0c447c;background:linear-gradient(145deg,#c8dcf5,#8ab0e0);"><span class="ph-symbol">◈</span><span class="ph-name">Azurite</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Third Eye</p><h3 class="product-name">Azurite Bracelet</h3><p class="product-desc">Enlightenment, spiritual guidance and powerful healer. Expands mind, mental healing and aligns to truth.</p><div class="product-foot"><span class="product-price">₹900</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'azurite')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('azurite')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="abundance" onclick="openProduct('firoza')" style="--card-glow:rgba(29,158,117,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#c8eedf,#90d8be);"><img src="./african-firoza.png" alt="firoza" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#0f6e56;background:linear-gradient(145deg,#c8eedf,#90d8be);"><span class="ph-symbol">◇</span><span class="ph-name">African Firoza</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Throat Chakra</p><h3 class="product-name">African Firoza Bracelet</h3><p class="product-desc">Attracts prosperity and financial opportunities. Overcomes financial crisis and results in an abundant and happy life.</p><div class="product-foot"><span class="product-price">₹1,600</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'firoza')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('firoza')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="spiritual" onclick="openProduct('green-onyx')" style="--card-glow:rgba(29,158,117,0.20);">
+          <div class="product-img" style="background:linear-gradient(145deg,#cceedd,#9ad4b8);"><img src="./green-aventurine.png" alt="green-onyx" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#0e7a4a;background:linear-gradient(145deg,#cceedd,#9ad4b8);"><span class="ph-symbol">◉</span><span class="ph-name">Green Onyx</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Heart Chakra</p><h3 class="product-name">Green Onyx Bracelet</h3><p class="product-desc">Strength-giving, imparts self-confidence. Improves public speaking, memory and logic. Attracts positive energy and increases courage.</p><div class="product-foot"><span class="product-price">₹900</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'green-onyx')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('green-onyx')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="protection" onclick="openProduct('red-jasper')" style="--card-glow:rgba(216,90,48,0.20);">
+          <div class="product-img" style="background:linear-gradient(145deg,#f5ccc0,#e89888);"><img src="./red-jasper.png" alt="red-jasper" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#8a2e10;background:linear-gradient(145deg,#f5ccc0,#e89888);"><span class="ph-symbol">♡</span><span class="ph-name">Red Jasper</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Root Chakra</p><h3 class="product-name">Red Jasper Bracelet</h3><p class="product-desc">Relaxation, nurturing and protection. Calming effect, detoxifies blood and circulatory system.</p><div class="product-foot"><span class="product-price">₹900</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'red-jasper')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('red-jasper')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="spiritual" onclick="openProduct('ruby-zoisite')" style="--card-glow:rgba(212,83,126,0.20);">
+          <div class="product-img" style="background:linear-gradient(145deg,#f0dce8,#d8aac4);"><img src="./ruby-zoisite.png" alt="ruby-zoisite" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#8a2a50;background:linear-gradient(145deg,#f0dce8,#d8aac4);"><span class="ph-symbol">◈</span><span class="ph-name">Ruby Zoisite</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Crown Chakra</p><h3 class="product-name">Ruby Zoisite Bracelet</h3><p class="product-desc">Activates the crown chakra, facilitates soul memory and spiritual learning. Helpful in soul healing and amplifies aura.</p><div class="product-foot"><span class="product-price">₹900</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'ruby-zoisite')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('ruby-zoisite')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="spiritual" onclick="openProduct('sandstone')" style="--card-glow:rgba(180,178,169,0.25);">
+          <div class="product-img" style="background:linear-gradient(145deg,#ede8de,#d8ceb8);"><img src="./sandstone.png" alt="sandstone" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#7a6e58;background:linear-gradient(145deg,#ede8de,#d8ceb8);"><span class="ph-symbol">◇</span><span class="ph-name">Sandstone</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · Root Chakra</p><h3 class="product-name">Sandstone Bracelet</h3><p class="product-desc">Stone of creativity and focus. Provides deep grounding energy, stabilises emotions and aids in overcoming stress.</p><div class="product-foot"><span class="product-price">₹2,000</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'sandstone')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('sandstone')">Buy Now</button></div></div></div>
+        </div>
+        <div class="product-card reveal extra-crystal" data-cat="spiritual" onclick="openProduct('serpentine')" style="--card-glow:rgba(29,158,117,0.22);">
+          <div class="product-img" style="background:linear-gradient(145deg,#d0eedc,#a0d8b0);"><img src="./serprentine-bracelet.png" alt="serpentine" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')" loading="lazy"><div class="product-img-placeholder" style="color:#0e6e3a;background:linear-gradient(145deg,#d0eedc,#a0d8b0);"><span class="ph-symbol">◇</span><span class="ph-name">Serpentine</span></div></div>
+          <div class="product-info"><p class="product-type">Bracelet · All Chakras</p><h3 class="product-name">Serpentine Bracelet</h3><p class="product-desc">Opens new pathways for Kundalini energy. Earthing stone for meditation, brings wisdom and pain relief.</p><div class="product-foot"><span class="product-price">₹900</span><div style="display:flex;gap:8px;"><button class="add-btn" onclick="event.stopPropagation();addToCart(this,'serpentine')">Add to Cart</button><button class="buy-btn" onclick="event.stopPropagation();buyNow('serpentine')">Buy Now</button></div></div></div>
+        </div>
+
+        </div><!-- end extra-crystals -->
+      </div><!-- end products-grid -->
+
+    </div><!-- end tab-all -->
+
+    <!-- ══ SEE ALL BUTTON — sits below the 4 cards, above everything else ══ -->
+    <div id="see-all-wrap" style="text-align:center;margin-top:52px;">
+      <button id="see-all-btn" onclick="showAllCrystals()" style="display:inline-flex;align-items:center;gap:12px;padding:18px 48px;border:1.5px solid var(--terra);color:var(--terra);background:transparent;font-family:'Jost',sans-serif;font-size:12px;letter-spacing:2.5px;text-transform:uppercase;cursor:pointer;border-radius:2px;transition:all 0.3s;">
+        <span>See All 19 Crystals</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <p style="margin-top:14px;font-size:13px;color:var(--muted);font-family:'Cormorant Garamond',serif;font-style:italic;">Hand-picked, moon-cleansed &amp; charged with intention</p>
+    </div>
+
+  </div><!-- end container -->
+</section>
+
+<!-- ══ TESTIMONIALS ══ -->
+<section id="testimonials" data-num="03">
+  <div class="container">
+    <p class="section-label reveal">Loved by souls worldwide</p>
+    <h2 class="reveal">What our community says</h2>
+  </div>
+
+  <div class="marquee-wrap">
+    <div class="marquee-track" id="marquee1"></div>
+  </div>
+  <div style="height:16px;"></div>
+  <div class="marquee-wrap">
+    <div class="marquee-track marquee-track-rev" id="marquee2"></div>
+  </div>
+</section>
+
+<!-- ══ CHAKRA GUIDE ══ -->
+<section id="chakra-guide">
+  <div class="container">
+    <div class="chakra-inner">
+      <div class="chakra-intro reveal-left">
+        <p class="section-label">Interactive Guide</p>
+        <h2>The Seven Sacred <em>Chakras</em></h2>
+        <p>Each chakra is an energy centre in your body — when one is blocked or imbalanced, it affects your physical, emotional and spiritual wellbeing. Select a chakra to discover which crystals heal and activate it.</p>
+        <div class="chakra-list" id="chakra-list"></div>
+      </div>
+      <div class="chakra-detail reveal-right" id="chakra-detail">
+        <!-- filled by JS -->
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ RITUAL GUIDE ══ -->
+<section id="ritual-guide" data-num="04">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="section-label">Sacred Practice</p>
+      <h2>How to work with your crystals</h2>
+      <p>Your crystal is more than jewellery — it's a tool. Follow this ritual to activate its full energy and keep it working for you.</p>
+    </div>
+    <div class="ritual-steps">
+      <div class="ritual-step reveal" style="transition-delay:0.1s;">
+        <div class="ritual-step-num">01</div>
+        <div class="ritual-icon">🌊</div>
+        <h3>Cleanse</h3>
+        <p>Before wearing your crystal for the first time, cleanse it. Hold it under running water for 60 seconds, or leave it in sunlight for an hour, or place it overnight on a selenite plate. This removes any stale energy from transit.</p>
+      </div>
+      <div class="ritual-step reveal" style="transition-delay:0.2s;">
+        <div class="ritual-step-num">02</div>
+        <div class="ritual-icon">🕯️</div>
+        <h3>Set Intention</h3>
+        <p>Hold the crystal in your palms, close your eyes and breathe deeply three times. Speak your intention aloud or in your mind — be specific. "I am open to love," "I attract abundance effortlessly." Feel it in your body.</p>
+      </div>
+      <div class="ritual-step reveal" style="transition-delay:0.3s;">
+        <div class="ritual-step-num">03</div>
+        <div class="ritual-icon">✨</div>
+        <h3>Wear &amp; Receive</h3>
+        <p>Wear your bracelet on your left wrist to receive its energy, or right wrist to project and give its qualities outward. Re-cleanse monthly under the full moon. The more you connect with it consciously, the stronger it works.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ ABOUT ══ -->
+<section id="about">
+  <div class="container">
+    <div class="about-grid">
+      <div class="about-img-wrap reveal-left">
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style="opacity:0.2">
+          <circle cx="40" cy="40" r="36" stroke="#6B7C5E" stroke-width="2"/>
+          <path d="M40 8 C40 8 16 28 16 48 C16 62 26 72 40 72 C54 72 64 62 64 48 C64 28 40 8 40 8Z" stroke="#6B7C5E" stroke-width="1.5" fill="none"/>
+          <line x1="40" y1="8" x2="40" y2="72" stroke="#6B7C5E" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="about-text reveal-right">
+        <p class="section-label">Our Story</p>
+        <h2>Born from a deep love of <em>healing &amp; light</em></h2>
+        <p>Heal Yourr Self was born after years of personal healing — working with crystals, energy, meditation and hands-on healing sessions. We saw how many people were searching for real, grounded, accessible healing tools and guidance.</p>
+        <p>Every crystal is personally sourced and charged with intention. Every meditation is recorded from the heart. Every healing session is held with full presence and care. We believe you deserve to feel whole.</p>
+        <div class="about-stats">
+          <div class="stat"><div class="stat-num">500+</div><div class="stat-label">Crystals rehomed</div></div>
+          <div class="stat"><div class="stat-num">40+</div><div class="stat-label">Guided meditations</div></div>
+          <div class="stat"><div class="stat-num">200+</div><div class="stat-label">Healing sessions</div></div>
+          <div class="stat"><div class="stat-num">4.9★</div><div class="stat-label">Client love</div></div>
+        </div>
+        <a href="#" class="btn">Read Our Full Story</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ MEDITATIONS ══ -->
+<section id="meditations">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="section-label">Audio &amp; Digital</p>
+      <h2>Guided Meditations</h2>
+      <p>Download instantly. Listen anywhere. Each track is crafted to bring you deeper into presence, healing and stillness.</p>
+    </div>
+    <div class="meditation-list">
+      <div class="meditation-card reveal"><div class="play-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg></div><div class="med-info"><p class="med-meta">14 min · Heart Chakra</p><h3 class="med-title">Opening the Heart</h3><p class="med-desc">A soft, guided journey to release old wounds and welcome love back in. Includes rose quartz visualization.</p><span class="med-price">₹199 · MP3 Download</span></div></div>
+      <div class="meditation-card reveal" style="transition-delay:0.1s;"><div class="play-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg></div><div class="med-info"><p class="med-meta">22 min · Grounding</p><h3 class="med-title">Earth Body Scan</h3><p class="med-desc">Deep grounding meditation to anchor your energy, release anxiety and feel safe in your body and home.</p><span class="med-price">₹249 · MP3 Download</span></div></div>
+      <div class="meditation-card reveal" style="transition-delay:0.2s;"><div class="play-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg></div><div class="med-info"><p class="med-meta">18 min · Sleep</p><h3 class="med-title">Crystal Sleep Journey</h3><p class="med-desc">Drift into deep, restful sleep with amethyst and moonstone visualizations woven through a soothing soundscape.</p><span class="med-price">₹199 · MP3 Download</span></div></div>
+      <div class="meditation-card reveal" style="transition-delay:0.3s;"><div class="play-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg></div><div class="med-info"><p class="med-meta">5-Album Bundle · Best Value</p><h3 class="med-title">Complete Healing Series</h3><p class="med-desc">All 5 meditation albums covering chakras, sleep, abundance, grief and daily calm. 60+ minutes of audio.</p><span class="med-price">₹799 · Full Bundle</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ HEALING SESSIONS ══ -->
+<section id="sessions" data-num="05">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="section-label">Work with me</p>
+      <h2>Healing Sessions</h2>
+      <p>Personal, one-on-one sessions held online or in person. Each session is tailored fully to you — your energy, your needs, your healing journey.</p>
+    </div>
+    <div class="sessions-grid">
+      <div class="session-card reveal">
+        <div class="session-head" style="background:var(--sage);">
+          <div class="session-icon">◈</div>
+          <h3 style="color:var(--cream);">Crystal Healing Session</h3>
+          <p style="color:#c8d6bc;">60 minutes · Online or In-person</p>
+        </div>
+        <div class="session-body">
+          <p>A full-body crystal healing session where crystals are placed on and around your energy centres. Deep relaxation, chakra balancing and energetic clearing.</p>
+          <ul class="session-features">
+            <li>✦ &nbsp;Full chakra assessment</li>
+            <li>✦ &nbsp;Crystal layout &amp; energy clearing</li>
+            <li>✦ &nbsp;Post-session guidance &amp; notes</li>
+            <li>✦ &nbsp;Crystal recommendation for home</li>
+          </ul>
+          <div class="session-foot">
+            <span class="session-price">₹1,499</span>
+            <button onclick="openBookingModal('Crystal Healing Session - ₹1,499')" class="btn btn-filled" style="font-size:11px;padding:10px 20px;">Book Now</button>
+        <div class="session-badge-bar">Most Popular</div>
+        <div class="session-head" style="background:var(--charcoal);">
+          <div class="session-icon">☽</div>
+          <h3 style="color:var(--cream);">Energy Healing + Meditation</h3>
+          <p style="color:#8a8880;">90 minutes · Online or In-person</p>
+        </div>
+        <div class="session-body">
+          <p>A combined session — crystal healing followed by a deeply personalised guided meditation recorded just for you. You leave with an MP3 of your personal meditation to keep forever.</p>
+          <ul class="session-features">
+            <li>✦ &nbsp;Full crystal healing session</li>
+            <li>✦ &nbsp;Personal guided meditation recorded for you</li>
+            <li>✦ &nbsp;MP3 of YOUR meditation to keep</li>
+            <li>✦ &nbsp;Follow-up voice note within 48hrs</li>
+          </ul>
+          <div class="session-foot">
+            <span class="session-price">₹2,199</span>
+            <button onclick="openBookingModal()" class="btn btn-filled" style="font-size:11px;padding:10px 20px;">Book Now</button>
+          </div>
+        </div>
+      </div>
+      <div class="session-card reveal" style="transition-delay:0.2s;">
+        <div class="session-head" style="background:#3C3489;">
+          <div class="session-icon">✦</div>
+          <h3 style="color:#EEEDFE;">Monthly Healing Journey</h3>
+          <p style="color:#AFA9EC;">4 sessions · 1 per week · Online</p>
+        </div>
+        <div class="session-body">
+          <p>A full month of healing support. One session per week plus unlimited WhatsApp support between sessions. Perfect for big life changes or deep emotional healing.</p>
+          <ul class="session-features">
+            <li>✦ &nbsp;4 × 60-minute healing sessions</li>
+            <li>✦ &nbsp;WhatsApp support all month</li>
+            <li>✦ &nbsp;Personalised crystal kit posted to you</li>
+            <li>✦ &nbsp;2 personal meditation MP3s</li>
+          </ul>
+          <div class="session-foot">
+            <span class="session-price">₹4,999</span>
+            <button onclick="openBookingModal()" class="btn btn-filled" style="font-size:11px;padding:10px 20px;">Book Now</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;background:var(--white);border-radius:16px;padding:32px 24px;border:1px solid rgba(181,96,58,0.12);max-width:600px;margin:0 auto;" class="reveal">
+      <p style="font-family:'Cormorant Garamond',serif;font-size:24px;margin-bottom:10px;font-style:italic;">How to book your session</p>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:24px;line-height:1.8;">Drop your name, session choice and preferred time below and I will personally get back to you within 24 hours.</p>
+      <button onclick="openBookingModal()" class="btn btn-filled">Send a Booking Request</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══ BLOG ══ -->
+<section id="blog">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="section-label">Our Journal</p>
+      <h2>Stories, Wisdom &amp; Guides</h2>
+      <p>We share what we learn — crystal guides, meditation tips, seasonal rituals and slow living inspiration.</p>
+    </div>
+    <div class="blog-grid">
+      <div class="blog-card reveal"><div class="blog-img"><div class="blog-img-placeholder">🌿</div></div><div class="blog-content"><p class="blog-tag">Crystal Guide</p><h3 class="blog-title">How to Cleanse &amp; Charge Your Crystals at Home</h3><p class="blog-excerpt">A complete beginner's guide to moonlight charging, sound cleansing, salt baths and intention setting — so your crystals stay energetically clear.</p><p class="blog-date">April 2025</p></div></div>
+      <div class="blog-card reveal" style="transition-delay:0.1s;"><div class="blog-img"><div class="blog-img-placeholder">☽</div></div><div class="blog-content"><p class="blog-tag">Ritual</p><h3 class="blog-title">A New Moon Crystal Ritual for Intention Setting</h3><p class="blog-excerpt">Simple, powerful and deeply nourishing — do this monthly to align your energy with the lunar cycle.</p><p class="blog-date">March 2025</p></div></div>
+      <div class="blog-card reveal" style="transition-delay:0.2s;"><div class="blog-img"><div class="blog-img-placeholder">✦</div></div><div class="blog-content"><p class="blog-tag">Meditation</p><h3 class="blog-title">5 Grounding Practices for Anxious Times</h3><p class="blog-excerpt">Short, practical grounding techniques you can do anywhere — with or without crystals — when anxiety rises.</p><p class="blog-date">February 2025</p></div></div>
+    </div>
+    <div style="text-align:center;margin-top:52px;" class="reveal"><a href="#" class="btn">Read All Posts</a></div>
+  </div>
+</section>
+
+<!-- ══ SUBSCRIBE ══ -->
+<section id="subscribe">
+  <div class="container reveal">
+    <p class="section-label" style="color:#c8d6bc;">Stay connected</p>
+    <h2>Join the Heal Yourr Self circle</h2>
+    <p>Crystal guides, free meditations, healing session availability &amp; moon rituals — straight to your inbox. No spam, ever.</p>
+    <div class="subscribe-form">
+      <input type="email" id="footer-email" placeholder="Your email address" />
+      <button class="sub-form-btn" onclick="handleFooterSubscribe()">Subscribe</button>
+    </div>
+    <p id="footer-msg" style="margin-top:16px;font-size:13px;color:#c8d6bc;display:none;">You're in! Welcome to the community.</p>
+  </div>
+</section>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#" class="nav-logo">Heal Yourr <span>Self</span></a>
+        <p>Crystals, guided meditations and one-on-one healing sessions — everything you need to come back to yourself.</p>
+      </div>
+      <div class="footer-col"><h4>Shop</h4><ul><li><a href="#shop">Crystals</a></li><li><a href="#shop">Crystal Sets</a></li><li><a href="#shop">Gift Boxes</a></li><li><a href="#meditations">Meditations</a></li></ul></div>
+      <div class="footer-col"><h4>Healing</h4><ul><li><a href="#sessions">Crystal Healing</a></li><li><a href="#sessions">Energy + Meditation</a></li><li><a href="#sessions">Monthly Journey</a></li><li><a href="#about">Our Story</a></li></ul></div>
+      <div class="footer-col"><h4>Help</h4><ul><li><a href="#">Booking Info</a></li><li><a href="#">Shipping Info</a></li><li><a href="#">Contact Us</a></li><li><a href="#">FAQ</a></li></ul></div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2025 Heal Yourr Self. Made with love &amp; intention.</p>
+      <div class="social-links">
+        <a href="#" title="Instagram">In</a>
+        <a href="#" title="Facebook">Fb</a>
+        <a href="#" title="YouTube">Yt</a>
+        <a href="#" title="Pinterest">Pt</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- ══ JAVASCRIPT ══ -->
+<script>
+(function() {
+
+/* ── PRODUCT DATA ── */
+window.products = {
+  'rose-quartz': { name:'Rose Quartz Bracelet', type:'Bracelet · Heart Chakra', price:'₹800', img:'rose-quartz.png', placeholder:'♡', modalBg:'linear-gradient(145deg,#f5e0e8,#eeccd8)', link:'https://payments.cashfree.com/links?code=ea7vdg342ql0_AAAAAAASyjU', attrs:{Chakra:'Heart',Element:'Water',Planet:'Venus',Color:'Pink'}, desc:'The ultimate stone of love and compassion. Rose Quartz opens the heart to all kinds of love — self love, family love, romantic love and friendship.', benefits:['Boosts self-love and self-worth','Heals relationship issues and heartbreak','Brings peace, calmness and harmony','Promotes mutual understanding','Inspires compassion and kindness'] },
+  'amethyst': { name:'Amethyst Bracelet', type:'Bracelet · Crown Chakra', price:'₹900', img:'amethyst.png', placeholder:'◈', modalBg:'linear-gradient(145deg,#e8e4f8,#d4cdf0)', link:'#', attrs:{Chakra:'Crown',Element:'Air',Planet:'Jupiter',Color:'Purple'}, desc:'A powerful and protective stone with a high spiritual vibration. Amethyst is a natural tranquiliser that relieves stress and strain.', benefits:['Improves focus, concentration and decision making','Brings success, serenity and new opportunities','Reduces insomnia and promotes deep sleep','Promotes hormonal balance','Powerful protective stone','Encourages spiritual wisdom','Strengthens immune system'] },
+  'citrine': { name:'Citrine Bracelet', type:'Bracelet · Solar Plexus', price:'₹2,000', img:'citrine.png', placeholder:'✦', modalBg:'linear-gradient(145deg,#fdf0cc,#f5e09a)', link:'#', attrs:{Chakra:'Solar Plexus',Element:'Fire',Planet:'Sun',Color:'Yellow'}, desc:"Known as the Merchant's Stone — Citrine is one of the most powerful stones for attracting abundance, wealth and success.", benefits:['Attracts wealth, prosperity and success','Imparts inner joy and enthusiasm','Brings financial abundance','Promotes positivity and optimism','Awakens creativity','Raises self-esteem','Powerful cleanser and regenerator'] },
+  'iron-pyrite': { name:'Iron Pyrite Bracelet', type:'Bracelet · Solar Plexus', price:'₹1,100', img:'iron-pyrite.png', placeholder:'⬡', modalBg:'linear-gradient(145deg,#f2eacc,#e8d890)', link:'#', attrs:{Chakra:'Solar Plexus',Element:'Earth',Planet:'Mars',Color:'Gold'}, desc:"Fool's Gold — but nothing foolish about its power. Iron Pyrite is a powerful stone for manifestation, protection and attracting abundance.", benefits:['Attracts wealth and financial abundance','Offers powerful energetic protection','Strengthens the solar plexus chakra','Protects and strengthens the aura','Ideal for manifestation meditation'] },
+  'money-magnet': { name:'Money Magnet Bracelet', type:'Combination Bracelet', price:'₹1,100', img:'money-magnet.png', placeholder:'◇', modalBg:'linear-gradient(145deg,#f5edcc,#e8d898)', link:'#', attrs:{Stones:'4 crystals',Purpose:'Abundance',Energy:'High',Type:'Combination'}, desc:'A powerful combination of Tiger Eye, Pyrite, Citrine and Aventurine — each chosen for its unique ability to draw abundance and amplify prosperity.', benefits:['Tiger Eye promotes confidence','Pyrite attracts wealth mindset','Citrine radiates positive energy','Aventurine adds luck and growth','Together they create an abundance field'] },
+  'triple-protection': { name:'Triple Protection Bracelet', type:'Combination Bracelet', price:'₹1,100', img:'triple-protection.png', placeholder:'◉', modalBg:'linear-gradient(145deg,#e0dedd,#c8c6c4)', link:'#', attrs:{Stones:'3 crystals',Purpose:'Protection',Energy:'Grounding',Type:'Combination'}, desc:'The ultimate protection bracelet — Tiger Eye, Black Obsidian and Hematite working together to shield your energy on all levels.', benefits:['Tiger Eye brings protection and personal power','Black Obsidian shields against all negativity','Hematite absorbs and transmutes negative energy','Promotes emotional healing and grounding','Enhances vitality and courage'] },
+  'malachite': { name:'Malachite Bracelet', type:'Bracelet · Heart Chakra', price:'₹2,300', img:'malachite.png', placeholder:'◉', modalBg:'linear-gradient(145deg,#cceedd,#a0d8b8)', link:'#', attrs:{Chakra:'Heart',Element:'Earth',Planet:'Venus',Color:'Green'}, desc:'The most important healing stone of the new millennium. Malachite absorbs negative energies from the atmosphere and body like no other stone.', benefits:['Grounds spiritual energies deeply','Absorbs all kinds of negative energies','Protects against radiation','Brings deep emotional healing','Opens heart to unconditional love','Clears and activates all chakras'] },
+  'labradorite': { name:'Labradorite Bracelet', type:'Bracelet · All Chakras', price:'₹1,500', img:'labradorite-bracelet.png', placeholder:'✦', modalBg:'linear-gradient(145deg,#cce0f8,#a0c4ee)', link:'#', attrs:{Chakra:'All Chakras',Element:'Storm',Energy:'Magical',Color:'Iridescent'}, desc:'A stone of magic and transformation. Labradorite is the stone of healers, diviners and all who travel the universe seeking knowledge.', benefits:['Stone of magic for healers','Awakens inner spirit and psychic abilities','Creates a protective shield around the aura','Brings personal magical powers to surface','Enhances clairvoyance and telepathy'] },
+  'tanzanite': { name:'Tanzanite Bracelet', type:'Bracelet · Third Eye & Crown', price:'₹4,600', img:'tenzanite.png', placeholder:'✦', modalBg:'linear-gradient(145deg,#dcd8f8,#b8b0ec)', link:'#', attrs:{Chakra:'Third Eye',Element:'Storm',Rarity:'Premium',Color:'Blue-Violet'}, desc:'One of the rarest and most powerful stones on earth. Tanzanite connects you to higher consciousness and facilitates communication with higher dimensions.', benefits:['Connects to higher consciousness','Stimulates intuition and higher perception','Aids detoxifying body and improves vitality','Deeply calming energy','Heals throat, third eye and crown chakra','Gives optimism and inspiration'] },
+  'garnet': { name:'Garnet Bracelet', type:'Bracelet · Sacral Chakra', price:'₹1,100', img:'garnet-bracelet.png', placeholder:'◉', modalBg:'linear-gradient(145deg,#f5d0c0,#e8a888)', link:'#', attrs:{Chakra:'Sacral',Element:'Fire',Planet:'Mars',Color:'Deep Red'}, desc:'A powerful energising and regenerating stone especially for women. Garnet cleanses and re-energises the chakras while inspiring love and devotion.', benefits:['Powerful energising stone for women','Cleanses and re-energises all chakras','Inspires love and devotion','Helps let go of old patterns','Opens heart and bestows self-confidence','Promotes hormonal balance for women'] },
+  'lapis-lazuli': { name:'Lapis Lazuli Bracelet', type:'Bracelet · Third Eye', price:'₹1,000', img:'lapis-lazuli.png', placeholder:'⬡', modalBg:'linear-gradient(145deg,#c8d8f0,#90aad8)', link:'#', attrs:{Chakra:'Third Eye',Element:'Water',Planet:'Saturn',Color:'Deep Blue Gold'}, desc:'A stone of wisdom, truth and royal energy. Lapis Lazuli has been used for thousands of years to awaken the third eye and activate inner power.', benefits:['Boosts the immune system','Awakens the third eye','Lowers blood pressure','Activates inner power','Connects to inner truth','Brings positive magic and manifestation'] },
+  'carnelian': { name:'Carnelian Bracelet', type:'Bracelet · Sacral Chakra', price:'₹900', img:'carnelian-bracelet.png', placeholder:'◉', modalBg:'linear-gradient(145deg,#fad8c0,#f0a878)',
+    link:'#', attrs:{Chakra:'Sacral',Element:'Fire',Planet:'Mars',Color:'Orange-Red'},
+    desc:'A stabilising crystal that restores vitality and motivation. Carnelian makes you fearless, action-oriented and truthful in all areas of life.',
+    benefits:['Makes you fearless and action-oriented','Enhances skills, talents and creativity','Natural cleanser — cleanses other crystals','Brings abundance and prosperity','Restores vitality and motivation','Powerful protector against negative energies','Balances all chakras','Aids with anxiety, depression and stress']
+  },
+  'azurite': { name:'Azurite Bracelet', type:'Bracelet · Third Eye', price:'₹900', img:'azurite.png', placeholder:'◈', modalBg:'linear-gradient(145deg,#c8dcf5,#8ab0e0)',
+    link:'#', attrs:{Chakra:'Third Eye',Element:'Water',Planet:'Jupiter',Color:'Deep Blue'},
+    desc:'A stone of enlightenment and spiritual guidance. Azurite expands the mind and deepens your connection to spiritual truth.',
+    benefits:['Brings enlightenment and awakening','Provides spiritual guidance','Powerful physical and emotional healer','Expands the mind and consciousness','Supports mental healing and clarity','Instils bravery and courage','Aligns you to your truth','Deep emotional healing']
+  },
+  'firoza': { name:'African Firoza Bracelet', type:'Bracelet · Throat Chakra', price:'₹1,600', img:'african-firoza.png', placeholder:'◇', modalBg:'linear-gradient(145deg,#c8eedf,#90d8be)',
+    link:'#', attrs:{Chakra:'Throat',Element:'Water',Origin:'Africa',Color:'Turquoise'},
+    desc:'The powerful Feroza stone is one of the oldest known healing stones. It is a strong attractor of prosperity and financial opportunities.',
+    benefits:['Attracts prosperity and abundance','Brings financial opportunities to the wearer','Helps get maximum financial support','Overcomes financial crisis and poverty','Results in an abundant and happy life']
+  },
+  'green-onyx': { name:'Green Onyx Bracelet', type:'Bracelet · Heart Chakra', price:'₹900', img:'green-aventurine.png', placeholder:'◉', modalBg:'linear-gradient(145deg,#cceedd,#9ad4b8)',
+    link:'#', attrs:{Chakra:'Heart',Element:'Earth',Energy:'Strength',Color:'Green'},
+    desc:'A strength-giving stone that empowers you to be the master of your own destiny. Green Onyx promotes vigour, steadfastness and stamina.',
+    benefits:['Gives great strength and power','Imparts self-confidence','Helps you master your own destiny','Promotes vigor, steadfastness and stamina','Aids in learning life lessons','Improves public speaking and memory','Improves sense of logic','Attracts positive energy','Increases courage','Helps comfort and heal the heart']
+  },
+  'red-jasper': { name:'Red Jasper Bracelet', type:'Bracelet · Root Chakra', price:'₹900', img:'red-jasper.png', placeholder:'♡', modalBg:'linear-gradient(145deg,#f5ccc0,#e89888)',
+    link:'#', attrs:{Chakra:'Root',Element:'Earth',Energy:'Grounding',Color:'Deep Red'},
+    desc:'A deeply nurturing and protective stone. Red Jasper brings a gentle calming energy that supports you through stress and difficulty.',
+    benefits:['Brings relaxation and contentment','Deep nurturing and compassion energy','Strong protection from negative forces','Supports completion of projects','Promotes healing on all levels','Has a deeply calming effect','Detoxifies blood and circulatory system']
+  },
+  'ruby-zoisite': { name:'Ruby Zoisite Bracelet', type:'Bracelet · Crown Chakra', price:'₹900', img:'ruby-zoisite.png', placeholder:'◈', modalBg:'linear-gradient(145deg,#f0dce8,#d8aac4)',
+    link:'#', attrs:{Chakra:'Crown & Heart',Element:'Storm',Energy:'Soul',Color:'Green & Pink'},
+    desc:'A powerful stone that activates the crown chakra and creates altered states of consciousness. Ruby Zoisite is exceptional for soul healing.',
+    benefits:['Activates the crown chakra','Creates altered states of consciousness','Facilitates access to soul memory','Supports spiritual learning','Promotes healthy individuality','Deeply helpful in soul healing','Amplifies the aura strongly']
+  },
+  'sandstone': { name:'Sandstone Bracelet', type:'Bracelet · Root Chakra', price:'₹2,000', img:'sandstone.png', placeholder:'◇', modalBg:'linear-gradient(145deg,#ede8de,#d8ceb8)',
+    link:'#', attrs:{Chakra:'Root',Element:'Earth',Energy:'Grounding',Color:'Beige'},
+    desc:'A stone of creativity and deep grounding. Sandstone provides the mental clarity and stability needed to follow your true path in life.',
+    benefits:['Stone of creativity and mental focus','Removes distractions and provides clarity','Provides deep grounding and stability','Stabilises emotions and overcomes stress','Symbolises strength and resilience','Helps uncover truth and dispel illusions','Fosters self-confidence']
+  },
+  'serpentine': { name:'Serpentine Bracelet', type:'Bracelet · All Chakras', price:'₹900', img:'serprentine-bracelet.png', placeholder:'◇', modalBg:'linear-gradient(145deg,#d0eedc,#a0d8b0)',
+    link:'#', attrs:{Chakra:'All Chakras',Element:'Earth',Energy:'Kundalini',Color:'Green'},
+    desc:'An earthing stone that opens new pathways for Kundalini energy to rise. Serpentine is exceptional for meditation and deep spiritual exploration.',
+    benefits:['Earthing stone for meditation','Opens psychic abilities','Opens new pathways for Kundalini energy','Brings wisdom and clarity','Helps feel more in control of life','Corrects mental and emotional imbalance','Brings contact with angelic guidance','Heals baggage from past relationships','Excellent for pain relief','Cleanses and detoxifies blood and body']
+  }
+};
+
+/* ── IMAGE PATH HELPER (remove before going live) ── */
+(function() {
+  if (window.location.protocol === 'file:') {
+    var banner = document.createElement('div');
+    banner.id = 'img-helper-banner';
+    banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#2C2B28;color:#EDE6DA;padding:12px 20px;font-family:Jost,sans-serif;font-size:13px;z-index:9999;display:flex;align-items:center;justify-content:space-between;gap:20px;border-top:2px solid #B5603A;';
+    banner.innerHTML = '<span>📁 <strong>Images not showing?</strong> Place all your .png crystal images in the <strong>same folder</strong> as this index.html file. Currently running from: <code style="background:#444;padding:2px 6px;border-radius:3px;">' + window.location.href.replace(/[^/]*$/, '') + '</code></span><button onclick="document.getElementById(\'img-helper-banner\').remove()" style="background:none;border:1px solid #B5603A;color:#D4896A;padding:6px 14px;cursor:pointer;border-radius:2px;font-family:Jost,sans-serif;font-size:12px;white-space:nowrap;">Got it ✕</button>';
+    document.body.appendChild(banner);
+  }
+})();
+(function() {
+  function fixImages() {
+    document.querySelectorAll('.product-img img').forEach(function(img) {
+      var ph = img.nextElementSibling;
+      if (!ph || !ph.classList.contains('product-img-placeholder')) return;
+      // Always show image by default — only show placeholder on confirmed error
+      img.style.display = 'block';
+      ph.classList.remove('show');
+      if (img.complete && img.naturalWidth === 0) {
+        img.style.display = 'none';
+        ph.classList.add('show');
+        return;
+      }
+      if (!img.dataset.errorBound) {
+        img.dataset.errorBound = '1';
+        img.addEventListener('error', function() {
+          img.style.display = 'none';
+          ph.classList.add('show');
+        }, { once: true });
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fixImages);
+  } else {
+    fixImages();
+  }
+  setTimeout(fixImages, 300);
+})();
+(function() {
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) {
+        setTimeout(function() { e.target.classList.add('visible'); }, (parseFloat(e.target.style.transitionDelay || 0) * 0) );
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal, .reveal-left, .reveal-right').forEach(function(el) { observer.observe(el); });
+})();
+
+/* ── NAV SCROLL ── */
+window.addEventListener('scroll', function() {
+  var nav = document.getElementById('main-nav');
+  if (nav) nav.classList.toggle('scrolled', window.scrollY > 60);
+});
+
+/* ── TESTIMONIALS ── */
+var testimonials = [
+  { text: "I bought the Rose Quartz bracelet during one of the hardest times in my life. Within two weeks, I felt a shift — softer, more open. I ended up reconnecting with my mum after three years of silence.", author: "Priya S., Mumbai", crystal: "Rose Quartz Bracelet", stars: 5 },
+  { text: "The Amethyst bracelet has completely changed my sleep. I used to wake at 3am every night with racing thoughts. Now I sleep deeply and wake feeling rested for the first time in years.", author: "Riya K., Bangalore", crystal: "Amethyst Bracelet", stars: 5 },
+  { text: "I was sceptical but my best friend gifted me the Money Magnet bracelet. Within a month I landed a new client that doubled my income. Coincidence? Maybe. But I'll never take it off.", author: "Ananya T., Delhi", crystal: "Money Magnet Bracelet", stars: 5 },
+  { text: "The healing session with this team was unlike anything I've experienced. I cried for most of it — not from sadness but from release. Felt ten kilos lighter walking out.", author: "Deepika R., Chennai", crystal: "Energy Healing Session", stars: 5 },
+  { text: "The Triple Protection bracelet literally makes me feel invincible. I wear it every day. Even my husband noticed I seem calmer and less reactive. The quality is stunning too.", author: "Meera J., Hyderabad", crystal: "Triple Protection Bracelet", stars: 5 },
+  { text: "Citrine is exactly what I needed. I'm a small business owner and I've been struggling. Since wearing it daily and setting intentions, three new contracts landed in one month.", author: "Kavya P., Pune", crystal: "Citrine Bracelet", stars: 5 },
+  { text: "The packaging alone made me emotional. Every detail was considered — the crystal arrived cleansed, with a handwritten note. It felt like receiving a gift from a dear friend.", author: "Sneha A., Kolkata", crystal: "Tanzanite Bracelet", stars: 5 },
+  { text: "I did the monthly healing journey during my divorce. Having that consistent support — the sessions, the WhatsApp check-ins — helped me stay grounded through the most chaotic period of my life.", author: "Sunita V., Ahmedabad", crystal: "Monthly Healing Journey", stars: 5 },
+  { text: "Malachite is powerful. I noticed immediately that arguments at home decreased. My children are calmer. The house feels like a completely different space energetically.", author: "Pooja M., Jaipur", crystal: "Malachite Bracelet", stars: 5 },
+  { text: "The crystal quiz was spot on. It recommended Amethyst and Lapis Lazuli for me. Both arrived and I felt an immediate pull to both — like they were always mine.", author: "Aisha R., Surat", crystal: "Crystal Quiz Experience", stars: 5 },
+  { text: "Labradorite called to me and I didn't know why. After wearing it for a week I started remembering my dreams vividly and started painting again after 5 years of creative block.", author: "Nisha D., Nagpur", crystal: "Labradorite Bracelet", stars: 5 },
+  { text: "The Garnet bracelet helped me reclaim myself after a relationship that left me feeling small. I feel like a woman again. Confident, worthy, alive.", author: "Kavitha L., Coimbatore", crystal: "Garnet Bracelet", stars: 5 }
+];
+
+function buildTestimonialCard(t) {
+  return '<div class="tcard"><div class="tcard-stars">' + '★'.repeat(t.stars) + '</div><p class="tcard-text">"' + t.text + '"</p><p class="tcard-author">' + t.author + '</p><p class="tcard-crystal">' + t.crystal + '</p></div>';
+}
+
+var m1 = document.getElementById('marquee1');
+var m2 = document.getElementById('marquee2');
+if (m1 && m2) {
+  var half1 = testimonials.slice(0, 6);
+  var half2 = testimonials.slice(6);
+  var html1 = half1.map(buildTestimonialCard).join('') + half1.map(buildTestimonialCard).join('');
+  var html2 = half2.map(buildTestimonialCard).join('') + half2.map(buildTestimonialCard).join('');
+  m1.innerHTML = html1;
+  m2.innerHTML = html2;
+}
+
+/* ── CHAKRA GUIDE ── */
+var chakras = [
+  { name:'Root Chakra', sanskrit:'Muladhara', color:'#E24B4A', pos:'Base of Spine', desc:'The root chakra governs your sense of safety, security and belonging. When balanced, you feel grounded, calm and at home in your body and life.', crystals:['Red Jasper','Garnet','Black Tourmaline','Carnelian'], productKeys:['garnet','carnelian'] },
+  { name:'Sacral Chakra', sanskrit:'Svadhisthana', color:'#EF9F27', pos:'Lower Abdomen', desc:'The sacral chakra governs creativity, pleasure, sensuality and emotional intelligence. Balanced, you feel joyful, creative and emotionally fluid.', crystals:['Carnelian','Garnet','Sunstone','Peach Moonstone'], productKeys:['carnelian','garnet'] },
+  { name:'Solar Plexus', sanskrit:'Manipura', color:'#FAC775', pos:'Upper Abdomen', desc:'The solar plexus chakra governs personal power, confidence and will. When balanced, you feel purposeful, confident and in charge of your destiny.', crystals:['Citrine','Iron Pyrite','Tiger Eye','Yellow Jasper'], productKeys:['citrine','iron-pyrite'] },
+  { name:'Heart Chakra', sanskrit:'Anahata', color:'#1D9E75', pos:'Centre of Chest', desc:'The heart chakra is the bridge between lower and higher energies. It governs love, compassion and connection to all living things.', crystals:['Rose Quartz','Malachite','Green Aventurine','Rhodonite'], productKeys:['rose-quartz','malachite'] },
+  { name:'Throat Chakra', sanskrit:'Vishuddha', color:'#378ADD', pos:'Throat', desc:'The throat chakra governs communication, expression and truth. When balanced, you speak authentically, listen deeply and express your true self with ease.', crystals:['Lapis Lazuli','Azurite','Sodalite','Blue Kyanite'], productKeys:['lapis-lazuli'] },
+  { name:'Third Eye', sanskrit:'Ajna', color:'#534AB7', pos:'Between Eyebrows', desc:'The third eye chakra governs intuition, imagination and inner vision. When open, you trust your gut, have vivid dreams and see beyond surface reality.', crystals:['Amethyst','Tanzanite','Lapis Lazuli','Azurite'], productKeys:['amethyst','tanzanite','lapis-lazuli'] },
+  { name:'Crown Chakra', sanskrit:'Sahasrara', color:'#AFA9EC', pos:'Top of Head', desc:'The crown chakra is your connection to universal consciousness, spiritual wisdom and pure awareness. When open, you experience deep peace and unity with all.', crystals:['Amethyst','Tanzanite','Clear Quartz','Labradorite'], productKeys:['amethyst','tanzanite','labradorite'] }
+];
+
+function buildChakraList() {
+  var list = document.getElementById('chakra-list');
+  if (!list) return;
+  list.innerHTML = chakras.map(function(c, i) {
+    return '<div class="chakra-item" onclick="selectChakra(' + i + ')" id="chakra-item-' + i + '"><div class="chakra-dot" style="background:' + c.color + ';"></div><span class="chakra-item-name">' + c.name + '</span><span class="chakra-item-crystal">' + c.crystals[0] + '</span></div>';
+  }).join('');
+  selectChakra(3);
+}
+
+window.selectChakra = function(idx) {
+  document.querySelectorAll('.chakra-item').forEach(function(el, i) { el.classList.toggle('active', i === idx); });
+  var c = chakras[idx];
+  var detail = document.getElementById('chakra-detail');
+  if (!detail) return;
+  detail.innerHTML = '<div class="chakra-detail-color" style="background:' + c.color + ';"></div><h3>' + c.name + '</h3><p class="chakra-detail-sub">' + c.sanskrit + ' · ' + c.pos + '</p><p>' + c.desc + '</p><div class="chakra-crystals">' + c.crystals.map(function(cr) { return '<span class="chakra-crystal-tag">' + cr + '</span>'; }).join('') + '</div>';
+};
+
+buildChakraList();
+
+/* ── CRYSTAL QUIZ ── */
+var quizAnswers = {};
+var currentStep = 0;
+
+window.selectQuizOption = function(step, val) {
+  quizAnswers[step] = val;
+  document.querySelectorAll('#qstep-' + step + ' .quiz-option').forEach(function(opt) { opt.classList.remove('selected'); });
+  event.currentTarget.classList.add('selected');
+  var nextBtn = document.getElementById('qnext-' + step);
+  if (nextBtn) { nextBtn.disabled = false; nextBtn.style.opacity = '1'; nextBtn.style.cursor = 'pointer'; }
+};
+
+window.nextQuizStep = function() {
+  var currentEl = document.getElementById('qstep-' + currentStep);
+  if (currentEl) currentEl.classList.remove('active');
+  currentStep++;
+  var nextEl = document.getElementById('qstep-' + currentStep);
+  if (nextEl) nextEl.classList.add('active');
+  document.querySelectorAll('.quiz-dot').forEach(function(dot, i) { dot.classList.toggle('active', i <= currentStep); });
+};
+
+window.getQuizResult = async function() {
+  var currentEl = document.getElementById('qstep-' + currentStep);
+  if (currentEl) currentEl.classList.remove('active');
+  document.getElementById('qstep-loading').classList.add('active');
+  document.querySelectorAll('.quiz-dot').forEach(function(dot) { dot.classList.add('active'); });
+
+  var prompt = 'You are a crystal healing expert for Heal Yourr Self, an Indian crystal shop.\n\nA customer has answered a 3-question crystal quiz:\n1. What they seek: ' + quizAnswers[0] + '\n2. Current energy: ' + quizAnswers[1] + '\n3. Colour resonance: ' + quizAnswers[2] + '\n\nOur available crystals: Rose Quartz (₹800, love/heart), Amethyst (₹900, spiritual/sleep), Citrine (₹2000, abundance), Iron Pyrite (₹1100, wealth/protection), Money Magnet combo (₹1100, abundance), Triple Protection combo (₹1100, protection), Malachite (₹2300, healing/protection), Labradorite (₹1500, spiritual/magic), Tanzanite (₹4600, spiritual premium), Garnet (₹1100, energy/women), Lapis Lazuli (₹1000, wisdom/throat), Carnelian (₹900, motivation/action).\n\nRespond ONLY with valid JSON (no markdown, no backticks). Format:\n{"heading":"Your Crystal is [name]","subheading":"Life Path Energy · [short phrase]","message":"[2-3 warm, personal, poetic sentences about why this crystal is perfect for them right now. Mention their answers naturally.]","crystals":["Crystal1 Bracelet","Crystal2 Bracelet"],"affirmation":"[A short empowering affirmation, one sentence, in first person present tense]"}';
+
+  try {
+    var res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    var data = await res.json();
+    var text = data.content.map(function(b) { return b.text || ''; }).join('');
+    var clean = text.replace(/```json|```/g, '').trim();
+    var result = JSON.parse(clean);
+    showQuizResult(result);
+  } catch(e) {
+    showQuizResult({
+      heading: 'Your Crystal is Calling',
+      subheading: 'Energy Reading Complete',
+      message: 'Based on your energy and intentions, you are being guided toward stones of deep healing and alignment. Trust what you feel drawn to — your intuition already knows.',
+      crystals: ['Rose Quartz Bracelet', 'Amethyst Bracelet'],
+      affirmation: 'I am open, aligned and ready to receive exactly what I need.'
+    });
+  }
+};
+
+function showQuizResult(result) {
+  document.getElementById('qstep-loading').classList.remove('active');
+  document.getElementById('qstep-result').classList.add('active');
+  var inner = document.getElementById('quiz-result-inner');
+  if (inner) {
+    inner.innerHTML = '<p class="quiz-result-num">' + (result.subheading || '') + '</p>' +
+      '<h3>' + (result.heading || '') + '</h3>' +
+      '<p>' + (result.message || '') + '</p>' +
+      '<div class="quiz-crystals-list">' + (result.crystals || []).map(function(c) { return '<span class="quiz-crystal-chip">✦ ' + c + '</span>'; }).join('') + '</div>' +
+      (result.affirmation ? '<p style="font-family:Cormorant Garamond,serif;font-size:19px;font-style:italic;color:var(--terra-lt);margin-top:4px;">"' + result.affirmation + '"</p>' : '') +
+      '<a href="#shop" class="quiz-next" style="display:inline-block;margin-top:20px;text-decoration:none;" onclick="closeQuizScroll()">Shop Your Crystals →</a>';
+  }
+}
+
+window.resetQuiz = function() {
+  quizAnswers = {};
+  currentStep = 0;
+  document.querySelectorAll('.quiz-step').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('qstep-0').classList.add('active');
+  document.querySelectorAll('.quiz-dot').forEach(function(d, i) { d.classList.toggle('active', i === 0); });
+  document.querySelectorAll('.quiz-option').forEach(function(o) { o.classList.remove('selected'); });
+  document.querySelectorAll('.quiz-next').forEach(function(b) { if (b.id && b.id.startsWith('qnext')) { b.disabled = true; b.style.opacity = '0.4'; b.style.cursor = 'not-allowed'; } });
+};
+
+window.closeQuizScroll = function() {};
+
+/* ── NUMEROLOGY AI BOT ── */
+var numBotOpen = false;
+var numConvHistory = [];
+var numBotStarted = false;
+
+window.openNumerologyBot = function() {
+  var panel = document.getElementById('num-panel');
+  var bot = document.getElementById('numerology-bot');
+  if (!numBotOpen) {
+    panel.classList.add('open');
+    bot.style.display = 'none';
+    numBotOpen = true;
+    if (!numBotStarted) { startNumerologyConversation(); numBotStarted = true; }
+  }
+};
+
+window.closeNumerologyBot = function() {
+  var panel = document.getElementById('num-panel');
+  var bot = document.getElementById('numerology-bot');
+  panel.classList.remove('open');
+  bot.style.display = 'block';
+  numBotOpen = false;
+};
+
+function addNumMsg(text, role, html) {
+  var msgs = document.getElementById('num-msgs');
+  if (!msgs) return;
+  var div = document.createElement('div');
+  div.className = 'num-msg ' + role;
+  div.innerHTML = '<div class="num-msg-bubble">' + (html || escapeHtml(text)) + '</div>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showNumTyping() {
+  var msgs = document.getElementById('num-msgs');
+  if (!msgs) return;
+  var div = document.createElement('div');
+  div.className = 'num-msg bot'; div.id = 'num-typing';
+  div.innerHTML = '<div class="num-typing"><span></span><span></span><span></span></div>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeNumTyping() {
+  var t = document.getElementById('num-typing');
+  if (t) t.remove();
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function startNumerologyConversation() {
+  var systemPrompt = 'You are Aanya, a warm spiritual numerology guide for "Heal Yourr Self" — an Indian crystal healing brand.\n\nYour job: Ask for DOB, calculate Life Path Number using CORRECT numerology, give a reading, recommend crystals.\n\nCORRECT Life Path calculation:\n- Add ALL digits of full DOB (DD+MM+YYYY)\n- Keep reducing until single digit OR master number 11, 22, 33\n- Example: 15/08/1990 → 1+5+0+8+1+9+9+0=33 → Master Number 33 (do NOT reduce further)\n- Example: 22/03/1985 → 2+2+0+3+1+9+8+5=30 → 3+0=3\n- Example: 05/07/1995 → 0+5+0+7+1+9+9+5=36 → 3+6=9\n- ALWAYS show your calculation step by step so user can verify\n\nLife Path meanings + crystals to recommend from our shop:\n1 (Leader/Pioneer): Independent, ambitious, born to lead. Crystals: Carnelian (₹900), Citrine (₹2000), Garnet (₹1100)\n2 (Peacemaker/Diplomat): Sensitive, cooperative, intuitive. Crystals: Rose Quartz (₹800), Amethyst (₹900), Malachite (₹2300)\n3 (Creative/Communicator): Expressive, joyful, artistic. Crystals: Carnelian (₹900), Labradorite (₹1500), Citrine (₹2000)\n4 (Builder/Organiser): Practical, disciplined, hardworking. Crystals: Iron Pyrite (₹1100), Triple Protection (₹1100), Lapis Lazuli (₹1000)\n5 (Explorer/Freedom-seeker): Adventurous, versatile, restless. Crystals: Labradorite (₹1500), Tanzanite (₹4600), African Firoza (₹1600)\n6 (Nurturer/Healer): Loving, responsible, family-oriented. Crystals: Rose Quartz (₹800), Malachite (₹2300), Garnet (₹1100)\n7 (Seeker/Mystic): Analytical, spiritual, truth-seeking. Crystals: Amethyst (₹900), Tanzanite (₹4600), Lapis Lazuli (₹1000)\n8 (Achiever/Powerhouse): Ambitious, business-minded, powerful. Crystals: Citrine (₹2000), Money Magnet (₹1100), Iron Pyrite (₹1100)\n9 (Humanitarian/Wise Soul): Compassionate, idealistic, old soul. Crystals: Rose Quartz (₹800), Amethyst (₹900), Malachite (₹2300)\n11 (Master Intuitive): Highly sensitive, psychic, spiritual messenger. Crystals: Tanzanite (₹4600), Labradorite (₹1500), Amethyst (₹900)\n22 (Master Builder): Visionary leader who builds for humanity. Crystals: Citrine (₹2000), Lapis Lazuli (₹1000), Iron Pyrite (₹1100)\n33 (Master Teacher): Rare healer and teacher of humanity. Crystals: Rose Quartz (₹800), Tanzanite (₹4600), Malachite (₹2300)\n\nFlow:\n1. Greet warmly, ask for date of birth in DD/MM/YYYY format\n2. When they share DOB: show your calculation clearly, state their Life Path Number\n3. Give 3-4 sentences about their Life Path personality — make it personal and specific\n4. Recommend exactly 2 crystals with WHY each one is right for their number\n5. Format product links as: [PRODUCT:product-key:Product Name ₹price]\nProduct keys: rose-quartz, amethyst, citrine, iron-pyrite, money-magnet, triple-protection, malachite, labradorite, tanzanite, garnet, lapis-lazuli, carnelian, firoza\n\nTone: Warm, mystical but grounded. Short responses. Use ✦ sparingly. Never make up data — always calculate properly.';
+
+  numConvHistory = [{ role: 'user', content: 'Hello, I am new here.' }];
+
+  showNumTyping();
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: numConvHistory
+    })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    removeNumTyping();
+    var text = data.content.map(function(b) { return b.text || ''; }).join('');
+    numConvHistory.push({ role: 'assistant', content: text });
+    addNumMsg('', 'bot', formatNumBotMsg(text));
+  }).catch(function() {
+    removeNumTyping();
+    addNumMsg('Namaste! ✦ I\'m Aanya, your crystal numerology guide. I\'d love to do a reading for you. Could you share your date of birth? (DD/MM/YYYY)', 'bot');
+  });
+
+  window._numSystemPrompt = systemPrompt;
+}
+
+function formatNumBotMsg(text) {
+  var html = escapeHtml(text);
+  html = html.replace(/\[PRODUCT:([^\]:]+):([^\]]+)\]/g, function(m, key, name) {
+    return '<a href="#shop" onclick="openProduct(\'' + key + '\');return false;" style="color:var(--terra);text-decoration:underline;font-weight:500;">' + name + '</a>';
+  });
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+window.sendNumMsg = function() {
+  var input = document.getElementById('num-input');
+  if (!input) return;
+  var text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  addNumMsg(text, 'user');
+  numConvHistory.push({ role: 'user', content: text });
+  showNumTyping();
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system: window._numSystemPrompt || '',
+      messages: numConvHistory
+    })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    removeNumTyping();
+    var reply = data.content.map(function(b) { return b.text || ''; }).join('');
+    numConvHistory.push({ role: 'assistant', content: reply });
+    addNumMsg('', 'bot', formatNumBotMsg(reply));
+  }).catch(function() {
+    removeNumTyping();
+    addNumMsg('I\'m having a little trouble connecting to the stars right now — please try again in a moment. ◈', 'bot');
+  });
+};
+
+/* ── MODAL ── */
+window.openProduct = function(key) {
+  var p = products[key]; if (!p) return;
+  document.getElementById('modal-type').textContent = p.type;
+  document.getElementById('modal-name').textContent = p.name;
+  document.getElementById('modal-price').textContent = p.price;
+  document.getElementById('modal-desc').textContent = p.desc;
+  var img = document.getElementById('modal-img'); var ph = document.getElementById('modal-img-placeholder');
+  img.src = p.img; img.style.display = 'block'; ph.style.display = 'none';
+  img.onload = function() { img.style.display='block'; ph.style.display='none'; };
+  img.onerror = function() {
+    img.style.display = 'none';
+    ph.style.display = 'flex';
+    ph.textContent = p.placeholder;
+    ph.style.fontSize = '80px';
+    var bg = p.modalBg || 'linear-gradient(145deg,#EDE6DA,#E0D8CC)';
+    document.getElementById('modal-img-wrap').style.background = bg;
+  };
+  var attrsHtml = ''; for (var k in p.attrs) { attrsHtml += '<div class="modal-attr"><div class="modal-attr-label">'+k+'</div><div class="modal-attr-value">'+p.attrs[k]+'</div></div>'; }
+  document.getElementById('modal-attrs').innerHTML = attrsHtml;
+  var bHtml = ''; p.benefits.forEach(function(b) { bHtml += '<li><span class="dot-b"></span>'+b+'</li>'; });
+  document.getElementById('modal-benefits').innerHTML = bHtml;
+  var buyBtn = document.getElementById('modal-buy'); buyBtn.href = p.link; buyBtn.textContent = 'Buy Now — ' + p.price;
+  document.getElementById('product-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('modal-add-cart').dataset.key = key;
+};
+window.addToCartFromModal = function() { var key = document.getElementById('modal-add-cart').dataset.key; addToCart(document.getElementById('modal-add-cart'), key); };
+window.closeModal = function() { document.getElementById('product-modal').classList.remove('open'); document.body.style.overflow = ''; };
+document.getElementById('product-modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeModal(); closeNumerologyBot(); } });
+
+/* ── POPUP ── */
+window.addEventListener('load', function() {
+  if (!sessionStorage.getItem('subscribed')) {
+    setTimeout(function() { document.getElementById('popup-overlay').classList.add('show'); }, 2500);
+  }
+});
+window.closePopup = function() { document.getElementById('popup-overlay').classList.remove('show'); };
+document.getElementById('popup-close').addEventListener('click', window.closePopup);
+document.getElementById('popup-overlay').addEventListener('click', function(e) { if (e.target === this) window.closePopup(); });
+window.handlePopupSubscribe = function() {
+  var email = document.getElementById('popup-email').value;
+  if (!email.includes('@') || !email.includes('.')) { document.getElementById('popup-email').style.borderColor = '#E24B4A'; return; }
+  console.log('Subscribed:', email);
+  sessionStorage.setItem('subscribed', 'true');
+  document.getElementById('popup-body').innerHTML = '<div id="popup-success"><div class="check"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3B6D11" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><h3>Welcome aboard!</h3><p style="color:var(--muted);font-size:14px;margin-top:6px;">Check your inbox for a welcome gift.</p></div>';
+  setTimeout(closePopup, 2500);
+};
+
+/* ── FOOTER SUBSCRIBE ── */
+window.handleFooterSubscribe = function() {
+  var email = document.getElementById('footer-email').value;
+  if (!email.includes('@')) return;
+  console.log('Footer subscribe:', email);
+  sessionStorage.setItem('subscribed', 'true');
+  document.getElementById('footer-email').value = '';
+  document.getElementById('footer-msg').style.display = 'block';
+};
+
+/* ── BOOKING MODAL ── */
+window.openBookingModal = function(sessionType) {
+  var sel = document.getElementById('bk-session');
+  if (sessionType && sel) {
+    for (var i=0; i<sel.options.length; i++) {
+      if (sel.options[i].text.indexOf(sessionType.split('-')[0].trim()) > -1) { sel.selectedIndex = i; break; }
+    }
+  }
+  document.getElementById('booking-overlay').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+};
+window.closeBookingModal = function() {
+  document.getElementById('booking-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+};
+document.getElementById('booking-overlay').addEventListener('click', function(e){ if(e.target===this) closeBookingModal(); });
+
+window.submitBooking = async function() {
+  var name = document.getElementById('bk-name').value.trim();
+  var phone = document.getElementById('bk-phone').value.trim();
+  var email = document.getElementById('bk-email').value.trim();
+  var session = document.getElementById('bk-session').value;
+  var reason = document.getElementById('bk-reason').value.trim();
+  var err = document.getElementById('bk-error');
+  if (!name || !phone || !email || !reason) { err.textContent = 'Please fill all required fields'; return; }
+  if (!email.includes('@')) { err.textContent = 'Please enter a valid email'; return; }
+  err.textContent = '';
+  var bookingData = {
+    id: 'booking_' + Date.now(),
+    name, phone, email, session, reason,
+    status: 'new',
+    createdAt: new Date().toISOString()
+  };
+  try {
+    if (window._setDoc && window._doc && window._db) {
+      await window._setDoc(window._doc(window._db, 'bookings', bookingData.id), bookingData);
+    }
+  } catch(e) { console.log('Booking save error:', e); }
+  document.getElementById('booking-form').style.display = 'none';
+  document.getElementById('booking-success').style.display = 'block';
+  setTimeout(closeBookingModal, 4000);
+  setTimeout(function() {
+    document.getElementById('booking-form').style.display = 'block';
+    document.getElementById('booking-success').style.display = 'none';
+    document.getElementById('bk-name').value = '';
+    document.getElementById('bk-phone').value = '';
+    document.getElementById('bk-email').value = '';
+    document.getElementById('bk-reason').value = '';
+  }, 4500);
+};
+var allCrystalsShown = false;
+window.showAllCrystals = function() {
+  allCrystalsShown = true;
+  document.querySelectorAll('.extra-crystal').forEach(function(card) {
+    card.classList.add('expanded');
+    setTimeout(function() { card.classList.add('visible'); }, 80);
+  });
+  setTimeout(fixImages, 150);
+  var btn = document.getElementById('see-all-btn');
+  if (btn) {
+    btn.innerHTML = '<span>Show Less</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>';
+    btn.onclick = function() { hideSomeCrystals(); };
+  }
+};
+
+window.hideSomeCrystals = function() {
+  allCrystalsShown = false;
+  document.querySelectorAll('.extra-crystal').forEach(function(card) {
+    card.classList.remove('expanded');
+    card.classList.remove('visible');
+  });
+  var btn = document.getElementById('see-all-btn');
+  if (btn) {
+    btn.innerHTML = '<span>See All 19 Crystals</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+    btn.onclick = function() { showAllCrystals(); };
+  }
+  document.getElementById('shop').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+/* ── SHOP TABS ── */
+window.switchTab = function(tab, btn) {
+  document.querySelectorAll('.shop-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+  var seeAllWrap = document.getElementById('see-all-wrap');
+  document.querySelectorAll('.product-card').forEach(function(card) {
+    if (tab === 'all') {
+      if (card.classList.contains('extra-crystal')) {
+        if (!allCrystalsShown) card.classList.remove('expanded');
+      } else {
+        card.style.display = 'block';
+      }
+    } else {
+      // category tab — show ALL matching crystals including extras
+      if (card.dataset.cat === tab) {
+        card.style.display = 'block';
+        card.classList.add('expanded');
+      } else {
+        card.style.display = 'none';
+        if (card.classList.contains('extra-crystal')) card.classList.remove('expanded');
+      }
+    }
+  });
+  if (seeAllWrap) seeAllWrap.style.display = (tab === 'all') ? 'block' : 'none';
+};
+
+/* ── CART ── */
+window.cartItems = [];
+window.addToCart = function(btn, key) {
+  if (!window.currentUser) { openAuthModal(); return; }
+  var p = products[key]; if (!p) return;
+  var existing = window.cartItems.find(function(i) { return i.key === key; });
+  if (existing) { existing.qty += 1; } else { window.cartItems.push({ key:key, name:p.name, type:p.type, price:p.price, priceNum:parseInt(p.price.replace(/[^0-9]/g,'')), img:p.img, placeholder:p.placeholder, qty:1 }); }
+  btn.textContent = 'Added ✓'; btn.style.background='var(--sage)'; btn.style.color='#fff'; btn.style.borderColor='var(--sage)';
+  setTimeout(function(){ btn.textContent='Add to Cart'; btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }, 1800);
+  renderCart(); if (window.saveCartToFirebase) window.saveCartToFirebase(); openCart();
+};
+window.buyNow = function(key) {
+  if (!window.currentUser) { openAuthModal(); return; }
+  var p = products[key]; if (!p) return;
+  var existing = window.cartItems.find(function(i) { return i.key === key; });
+  if (!existing) { window.cartItems.push({ key:key, name:p.name, type:p.type, price:p.price, priceNum:parseInt(p.price.replace(/[^0-9]/g,'')), img:p.img, placeholder:p.placeholder, qty:1 }); }
+  renderCart(); if (window.saveCartToFirebase) window.saveCartToFirebase(); window.location.href = 'checkout.html';
+};
+window.renderCart = function() {
+  var items = window.cartItems || []; var badge = document.getElementById('cart-badge');
+  var totalQty = items.reduce(function(s,i){ return s+i.qty; }, 0);
+  if (badge) { badge.textContent = totalQty; badge.className = totalQty > 0 ? 'visible' : ''; }
+  var countHead = document.getElementById('cart-count-head'); if (countHead) countHead.textContent = totalQty > 0 ? totalQty+' item'+(totalQty>1?'s':'') : '';
+  var container = document.getElementById('cart-items'); var footer = document.getElementById('cart-footer'); if (!container) return;
+  if (items.length === 0) { if (footer) footer.style.display='none'; container.innerHTML='<div id="cart-empty"><div class="ei">🛒</div><p>Your cart is empty</p><button class="btn" onclick="closeCart()">Continue Shopping</button></div>'; return; }
+  if (footer) footer.style.display = 'block';
+  var html = ''; var subtotal = 0;
+  items.forEach(function(item, idx) {
+    subtotal += item.priceNum * item.qty;
+    html += '<div class="cart-item"><div class="cart-item-img"><img src="'+item.img+'" alt="'+item.name+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'block\'"><span style="display:none;">'+item.placeholder+'</span></div><div class="cart-item-info"><p class="cart-item-name">'+item.name+'</p><p class="cart-item-type">'+item.type+'</p><div class="cart-item-bottom"><span class="cart-item-price">'+item.price+'</span><div class="cart-qty"><button class="qty-btn" onclick="changeQty('+idx+',-1)">−</button><span class="qty-num">'+item.qty+'</span><button class="qty-btn" onclick="changeQty('+idx+',1)">+</button></div></div></div><button class="cart-item-remove" onclick="removeFromCart('+idx+')">✕</button></div>';
+  });
+  container.innerHTML = html;
+  var fmt = '₹'+subtotal.toLocaleString('en-IN');
+  var sub = document.getElementById('cart-subtotal'); if(sub) sub.textContent=fmt;
+  var tot = document.getElementById('cart-total'); if(tot) tot.textContent=fmt;
+};
+window.changeQty = function(idx, delta) { window.cartItems[idx].qty += delta; if (window.cartItems[idx].qty <= 0) window.cartItems.splice(idx,1); renderCart(); if(window.saveCartToFirebase) window.saveCartToFirebase(); };
+window.removeFromCart = function(idx) { window.cartItems.splice(idx,1); renderCart(); if(window.saveCartToFirebase) window.saveCartToFirebase(); };
+window.openCart = function() { document.getElementById('cart-overlay').classList.add('open'); document.body.style.overflow='hidden'; };
+window.closeCart = function() { document.getElementById('cart-overlay').classList.remove('open'); document.body.style.overflow=''; };
+
+window.handleCheckout = function() {
+  if (!window.currentUser) { openAuthModal(); return; }
+  var items = window.cartItems; if (!items || items.length === 0) return;
+  var total = items.reduce(function(s,i){ return s+i.priceNum*i.qty; }, 0);
+  var orderData = { id:'order_'+Date.now()+'_'+Math.random().toString(36).substr(2,9), userId:window.currentUser.uid, email:window.currentUser.email, items:items.map(function(i){ return {key:i.key,name:i.name,qty:i.qty,price:i.price}; }), subtotal:total, total:total, status:'pending', createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+  window._setDoc(window._doc(window._db,'orders',orderData.id), orderData).then(function() { return window._getDoc(window._doc(window._db,'users',window.currentUser.uid)); }).then(function(userSnap) { var ud=userSnap.data()||{}; var uo=ud.orders||[]; uo.push(orderData); return window._setDoc(window._doc(window._db,'users',window.currentUser.uid),{orders:uo},{merge:true}); }).then(function() { if(window.sendOrderConfirmationEmail) window.sendOrderConfirmationEmail(orderData); initiateCashfreePayment(orderData, total); }).catch(function(err) { console.error('Order creation failed:',err); alert('Error creating order. Please try again.'); });
+};
+window.initiateCashfreePayment = function(orderData, amount) {
+  var orderSummary = 'Heal Yourr Self Order\n';
+  orderData.items.forEach(function(item) { orderSummary += '\n'+item.name+' × '+item.qty+' = '+item.price; });
+  orderSummary += '\n\nTotal: ₹'+amount;
+  alert('Order #'+orderData.id+' has been created!\n\n'+orderSummary+'\n\nPayment link will be sent to: '+orderData.email+'\n\nCheck your email for payment details.');
+  window.cartItems = []; window.saveCartToFirebase(); renderCart(); closeCart();
+  alert('✅ Order confirmed! Thank you for your purchase.\n\nOrder ID: '+orderData.id);
+};
+
+/* ── AUTH ── */
+window.openAuthModal = function() { document.getElementById('auth-overlay').classList.add('open'); document.body.style.overflow='hidden'; };
+window.closeAuthModal = function() { document.getElementById('auth-overlay').classList.remove('open'); document.body.style.overflow=''; };
+document.getElementById('auth-overlay').addEventListener('click', function(e){ if(e.target===this) closeAuthModal(); });
+window.switchAuthTab = function(tab) {
+  document.getElementById('tab-signin').className='auth-tab'+(tab==='signin'?' active':'');
+  document.getElementById('tab-signup').className='auth-tab'+(tab==='signup'?' active':'');
+  document.getElementById('auth-name-wrap').style.display=tab==='signup'?'block':'none';
+  document.getElementById('auth-submit-btn').textContent=tab==='signup'?'Create Account':'Sign In';
+  document.getElementById('auth-error').textContent=''; window._authMode=tab;
+};
+window._authMode='signin';
+window.handleAuthSubmit = function() { if(window._authMode==='signup'){ if(window.signUpEmail) window.signUpEmail(); } else { if(window.signInEmail) window.signInEmail(); } };
+
+/* ── PROFILE ── */
+window.openProfileModal = function() {
+  var user = window.currentUser; if (!user) return;
+  var pName=document.getElementById('profile-display-name'); var pEmail=document.getElementById('profile-display-email'); var pAvatar=document.getElementById('profile-avatar');
+  if(pName) pName.textContent=user.displayName||user.email;
+  if(pEmail) pEmail.textContent=user.email;
+  if(pAvatar) { if(user.photoURL){ pAvatar.innerHTML='<img src="'+user.photoURL+'" alt="avatar">'; } else { pAvatar.textContent=(user.displayName||user.email)[0].toUpperCase(); } }
+  loadOrderHistory(user.uid);
+  document.getElementById('profile-modal').classList.add('open');
+  if(window.loadAddress) window.loadAddress();
+};
+window.loadOrderHistory = function(userId) {
+  var oc=document.getElementById('order-history-container'); if(!oc) return;
+  window._getDoc(window._doc(window._db,'users',userId)).then(function(snap) {
+    if(snap.exists()&&snap.data().orders){ displayOrders(snap.data().orders); }
+    else { oc.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px;">No orders yet</p>'; }
+  }).catch(function() { oc.innerHTML='<p style="color:#E24B4A;">Error loading order history</p>'; });
+};
+window.displayOrders = function(orders) {
+  var container=document.getElementById('order-history-container'); var html='';
+  if(!orders||orders.length===0){ container.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px;">No orders yet</p>'; return; }
+  orders.forEach(function(order,idx) {
+    var date=new Date(order.createdAt).toLocaleDateString('en-IN');
+    var sc=order.status==='completed'?'#3B6D11':order.status==='pending'?'#C49A3C':'#E24B4A';
+    html+='<div style="background:var(--ivory);border-radius:8px;padding:16px;margin-bottom:12px;border-left:4px solid '+sc+'"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-weight:500;">Order #'+(idx+1)+'</span><span style="font-size:11px;padding:4px 10px;background:'+sc+';color:#fff;border-radius:12px;text-transform:uppercase;">'+order.status+'</span></div><p style="font-size:12px;color:var(--muted);margin:4px 0;">'+date+'</p><p style="font-size:14px;color:var(--terra);font-weight:500;margin:4px 0;">₹'+order.total.toLocaleString('en-IN')+'</p></div>';
+  });
+  container.innerHTML=html;
+};
+
+/* ── MOBILE MENU ── */
+window.toggleMenu = function() {
+  var links = document.querySelector('.nav-links');
+  var isOpen = links.classList.contains('mobile-open');
+  if (isOpen) {
+    links.classList.remove('mobile-open');
+    links.style.cssText = '';
+  } else {
+    links.style.cssText = 'display:flex;flex-direction:column;position:fixed;top:60px;left:0;right:0;background:rgba(247,243,237,0.98);backdrop-filter:blur(20px);padding:20px 20px 28px;gap:0;border-bottom:1px solid rgba(181,96,58,0.15);z-index:498;box-shadow:0 8px 32px rgba(44,43,40,0.1);';
+    links.classList.add('mobile-open');
+    // Style each link for mobile
+    links.querySelectorAll('a').forEach(function(a) {
+      a.style.cssText = 'padding:14px 4px;font-size:16px;border-bottom:1px solid rgba(181,96,58,0.08);letter-spacing:1px;';
+      a.onclick = function() { window.toggleMenu(); };
+    });
+  }
+};
+
+})();
+</script>
+</body>
+</html>
